@@ -1,0 +1,35 @@
+import { Controller, Get, Request } from "@nestjs/common";
+import { UserService } from "./user.service";
+import { PrismaService } from "src/prisma/prisma.service";
+
+@Controller("user")
+export class UserController {
+  constructor(
+    private readonly userService: UserService,
+    private readonly prismaService: PrismaService
+  ) {}
+
+  @Get()
+  async getAllUser(@Request() request) {
+    const user = await this.prismaService.user.findMany({
+      orderBy: { name: "asc" },
+      where: {
+        NOT: {
+          email: request.user.email,
+        },
+      },
+    });
+
+    const userGroupByInitialLetter = {};
+
+    user.forEach((user) => {
+      const initialLetter = user.name.charAt(0).toUpperCase();
+      if (!userGroupByInitialLetter[initialLetter]) {
+        userGroupByInitialLetter[initialLetter] = [];
+      }
+      userGroupByInitialLetter[initialLetter].push(user);
+    });
+
+    return userGroupByInitialLetter;
+  }
+}
