@@ -8,9 +8,14 @@ import { APP_GUARD } from "@nestjs/core";
 import { AuthGuard } from "./guards/auth.guards";
 import { MessageModule } from "./message/message.module";
 import { ConversationModule } from "./conversation/conversation.module";
+import { ServeStaticModule } from "@nestjs/serve-static";
+import { join } from "path";
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, "..", "public"), //
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),

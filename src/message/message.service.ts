@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { MessageType } from "@prisma/client";
+import { renameSync } from "fs";
 import { EventGateway } from "src/event/event.gateway";
 import { PrismaService } from "src/prisma/prisma.service";
 
