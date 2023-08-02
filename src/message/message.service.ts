@@ -46,7 +46,10 @@ export class MessageService {
         conversationId: conversation.id,
         senderId: userId,
         messageStatus:
-          getSeenUsersfromOnlineList.length > 0 ? "Delivered" : "Sent",
+          getSeenUsersfromOnlineList.length ===
+          usersInConversationExludingSender.length
+            ? "Delivered"
+            : "Sent",
 
         seenUsers: {
           connect: getSeenUsersfromOnlineList,

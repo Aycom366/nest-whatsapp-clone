@@ -1,4 +1,5 @@
 import {
+  MessageBody,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
@@ -15,11 +16,22 @@ export class EventGateway implements OnGatewayDisconnect {
   server: Server;
 
   public onlineUsers: Map<number, Socket> = new Map();
+  public usersCurrentChat: Map<number, number> = new Map();
 
   @SubscribeMessage("addUser")
   addUser(client: Socket, payload: { userId: number }) {
     const { userId } = payload;
     this.onlineUsers.set(Number(userId), client);
+  }
+
+  @SubscribeMessage("joinRoom")
+  joinRooms() {}
+
+  @SubscribeMessage("setCurrentChat")
+  setCurrentChat(
+    @MessageBody() data: { currentChatId: number; userId: number }
+  ) {
+    this.usersCurrentChat.set(data.userId, data.currentChatId);
   }
 
   handleDisconnect(socket: Socket) {

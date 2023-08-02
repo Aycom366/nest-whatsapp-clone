@@ -57,6 +57,35 @@ export class MessageController {
     });
   }
 
+  @Post("/file-upload/audio")
+  @UseInterceptors(
+    FileInterceptor("audio", {
+      dest: "public/audio",
+    })
+  )
+  uploadAudio(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 })],
+        errorHttpStatusCode: 400,
+      })
+    )
+    file: Express.Multer.File,
+    @Body("conversationId", ParseIntPipe) conversationId: number,
+    @Body("messageType", new ParseEnumPipe(MessageType))
+    messageType: MessageType,
+    @Request() request
+  ) {
+    const fileName = "public/audio/" + Date.now() + file.originalname;
+    renameSync(file.path, fileName);
+
+    return this.messageService.sendMessage(request.user.id, {
+      conversationId,
+      message: fileName,
+      messageType: messageType,
+    });
+  }
+
   @Get(":conversationId")
   fetchMessages(
     @Param("conversationId", ParseIntPipe) conversationId: number,

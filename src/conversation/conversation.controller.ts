@@ -11,10 +11,7 @@ export class ConversationController {
     @Body() body: CreateSingleConversation,
     @Request() request
   ) {
-    return this.conversationService.accessConversation(
-      body.userId,
-      request.user.id
-    );
+    return this.conversationService.accessConversation(body, request.user.id);
   }
 
   @Get("conversations")

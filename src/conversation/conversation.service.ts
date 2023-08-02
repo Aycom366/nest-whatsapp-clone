@@ -1,13 +1,18 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "src/prisma/prisma.service";
 
+interface IProp {
+  userId: number;
+  name?: string;
+}
+
 @Injectable()
 export class ConversationService {
   constructor(private readonly prismaService: PrismaService) {}
 
-  async accessConversation(userId: number, currentLoginUserId: number) {
+  async accessConversation(info: IProp, currentLoginUserId: number) {
     const user = await this.prismaService.user.findUnique({
-      where: { id: userId },
+      where: { id: info.userId },
     });
     if (!user) throw new NotFoundException();
 
@@ -17,7 +22,7 @@ export class ConversationService {
         isGroup: false, // Check if isGroup is false
         users: {
           every: {
-            id: { in: [userId, currentLoginUserId] },
+            id: { in: [info.userId, currentLoginUserId] },
           },
         },
       },
@@ -26,7 +31,9 @@ export class ConversationService {
           orderBy: {
             createdAt: "desc",
           },
-          take: 1,
+          include: {
+            seenUsers: { select: { id: true } },
+          },
         },
         users: true,
       },
@@ -37,11 +44,13 @@ export class ConversationService {
     } else {
       chat = await this.prismaService.conversation.create({
         data: {
-          name: user.name,
+          name: info.name
+            ? info.name + `?${Date.now()}`
+            : Math.random().toString() + Date.now(),
           users: {
             connect: [
               {
-                id: userId,
+                id: info.userId,
               },
               {
                 id: currentLoginUserId,
@@ -54,7 +63,9 @@ export class ConversationService {
             orderBy: {
               createdAt: "desc",
             },
-            take: 1,
+            include: {
+              seenUsers: { select: { id: true } },
+            },
           },
           users: true,
         },
@@ -78,8 +89,11 @@ export class ConversationService {
           orderBy: {
             createdAt: "desc",
           },
-          take: 1,
+          include: {
+            seenUsers: { select: { id: true } },
+          },
         },
+        users: true,
       },
       orderBy: {
         createdAt: "desc",
