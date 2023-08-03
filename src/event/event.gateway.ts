@@ -7,7 +7,10 @@ import {
 } from "@nestjs/websockets";
 import { Server } from "socket.io";
 
-@WebSocketGateway({ cors: "*" })
+@WebSocketGateway({
+  transports: ["websocket"],
+  cors: "*",
+})
 export class EventGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
@@ -36,7 +39,7 @@ export class EventGateway implements OnGatewayDisconnect {
   @SubscribeMessage("addUser")
   addUser(client: Socket, payload: { userId: number }) {
     const { userId } = payload;
-    client["userId"] = userId; //manually set a way to get socket since socket.id cant be changed
+    client["userId"] = userId; //manually set another way to identify user's socket
     this.onlineUsers.set(Number(userId), client);
     this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
   }
@@ -60,7 +63,6 @@ export class EventGateway implements OnGatewayDisconnect {
     if (userJoinedRooms) {
       for (const userId of userJoinedRooms) {
         if (this.onlineUsers.has(userId)) {
-          // If the user is in the onlineUsers Map, it means the user is online in the room
           onlineUsersInRoom.push(userId);
         }
       }

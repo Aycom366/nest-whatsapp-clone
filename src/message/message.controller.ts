@@ -2,19 +2,22 @@ import {
   Body,
   Controller,
   Get,
-  HttpStatus,
   MaxFileSizeValidator,
   Param,
   ParseEnumPipe,
   ParseFilePipe,
   ParseIntPipe,
+  Patch,
   Post,
   Request,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
 import { MessageService } from "./message.service";
-import { SendMessageDto } from "src/dtos/converseMessage.dto";
+import {
+  SendMessageDto,
+  UpdateMessageStatus,
+} from "src/dtos/converseMessage.dto";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { renameSync } from "fs";
 import { MessageType } from "@prisma/client";
@@ -84,6 +87,11 @@ export class MessageController {
       message: fileName,
       messageType: messageType,
     });
+  }
+
+  @Patch()
+  updateMessageStatus(@Body() body: UpdateMessageStatus, @Request() request) {
+    return this.messageService.updateMessageStatus(body, request.user.id);
   }
 
   @Get(":conversationId")

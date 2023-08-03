@@ -1,4 +1,4 @@
-import { MessageType } from "@prisma/client";
+import { MessageStatus, MessageType } from "@prisma/client";
 import {
   IsEnum,
   IsNotEmpty,
@@ -16,6 +16,11 @@ export class CreateSingleConversation {
   @IsString()
   @IsNotEmpty()
   name?: string;
+}
+
+export class UpdateMessageStatus {
+  @IsNumber()
+  messageId: number;
 }
 
 export class SendMessageDto {

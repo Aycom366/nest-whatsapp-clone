@@ -9,6 +9,10 @@ interface IProps {
   conversationId: number;
 }
 
+interface UpdateMessageStatusProps {
+  messageId: number;
+}
+
 @Injectable()
 export class MessageService {
   constructor(
@@ -58,6 +62,42 @@ export class MessageService {
     socketInstance.to(conversation.name).emit("messageReceived", message);
 
     return message;
+  }
+
+  async updateMessageStatus(body: UpdateMessageStatusProps, userId: number) {
+    const existingMessage = await this.prismaService.message.findUnique({
+      where: { id: body.messageId },
+      select: { seenUsers: true, conversationId: true },
+    });
+    if (!existingMessage) throw new NotFoundException();
+
+    const conversationData = await this.prismaService.conversation.findUnique({
+      where: { id: existingMessage.conversationId },
+    });
+
+    const updatedSeenUsers = [
+      ...existingMessage.seenUsers.map((item) => ({ id: item.id })),
+      { id: userId },
+    ];
+
+    const newMessage = await this.prismaService.message.update({
+      where: { id: body.messageId },
+      data: {
+        messageStatus: "Read",
+        seenUsers: {
+          connect: updatedSeenUsers,
+        },
+      },
+      include: {
+        seenUsers: true,
+        sender: true,
+      },
+    });
+
+    //send an emit event to everyone including the user who update
+    this.eventGateway.server
+      .to(conversationData.name)
+      .emit("updateMessageStatus", newMessage);
   }
 
   async fetchMessages(conversationId: number, loginUserId: number) {
