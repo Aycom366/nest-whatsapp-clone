@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { MessageType } from "@prisma/client";
-import { renameSync } from "fs";
 import { EventGateway } from "src/event/event.gateway";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -27,12 +26,17 @@ export class MessageService {
     if (!conversation) throw new NotFoundException();
 
     //Get users that are online that are in this conversation
-    const usersInConversationExludingSender = conversation.users
-      .filter((user) => user.id !== userId)
-      .map((userData) => userData.id);
+    const onlineUsersInRoom = this.eventGateway
+      .getOnlineUsersInRoom(conversation.name)
+      .filter((user) => user !== userId)
+      .map((item) => ({ id: item }));
 
-    const getSeenUsersfromOnlineList = usersInConversationExludingSender
-      .filter((userId) => this.eventGateway.onlineUsers.has(userId))
+    //use this to track delivered messages
+    const globalOnlineUsers = conversation.users
+      .filter(
+        (user) =>
+          user.id !== userId && this.eventGateway.onlineUsers.has(userId)
+      )
       .map((item) => ({ id: item }));
 
     const message = await this.prismaService.message.create({
@@ -45,30 +49,17 @@ export class MessageService {
         message: body.message,
         conversationId: conversation.id,
         senderId: userId,
-        messageStatus:
-          getSeenUsersfromOnlineList.length ===
-          usersInConversationExludingSender.length
-            ? "Delivered"
-            : "Sent",
-
+        messageStatus: globalOnlineUsers.length > 0 ? "Delivered" : "Sent",
         seenUsers: {
-          connect: getSeenUsersfromOnlineList,
+          connect: onlineUsersInRoom,
         },
         messageType: body.messageType,
       },
     });
 
-    const receivers = conversation.users.filter((user) => user.id !== userId);
+    const socketInstance = this.eventGateway.onlineUsers.get(userId);
 
-    receivers.forEach((receiver) => {
-      const userSocket = this.eventGateway.onlineUsers.get(receiver.id);
-
-      if (userSocket) {
-        this.eventGateway.server
-          .to(userSocket.id)
-          .emit("messageReceived", message);
-      }
-    });
+    socketInstance.to(conversation.name).emit("messageReceived", message);
 
     return message;
   }
