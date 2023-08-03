@@ -31,12 +31,8 @@ export class MessageService {
       .filter((user) => user !== userId)
       .map((item) => ({ id: item }));
 
-    //use this to track delivered messages
-    const globalOnlineUsers = conversation.users
-      .filter(
-        (user) =>
-          user.id !== userId && this.eventGateway.onlineUsers.has(userId)
-      )
+    const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys())
+      .filter((id) => id !== userId)
       .map((item) => ({ id: item }));
 
     const message = await this.prismaService.message.create({

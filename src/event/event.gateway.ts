@@ -27,20 +27,22 @@ export class EventGateway implements OnGatewayDisconnect {
     }
 
     userJoinedRooms.add(userId);
-    client.join(roomName);
 
-    const onlineUsersInRoom = this.getOnlineUsersInRoom(roomName);
-    this.server.to(roomName).emit("onlineUsers", onlineUsersInRoom);
+    client["userId"] = userId;
+
+    client.join(roomName);
   }
 
   @SubscribeMessage("addUser")
   addUser(client: Socket, payload: { userId: number }) {
     const { userId } = payload;
+    client["userId"] = userId; //manually set a way to get socket since socket.id cant be changed
     this.onlineUsers.set(Number(userId), client);
+    this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
   }
 
   handleDisconnect(socket: Socket) {
-    const userIdToRemove = Number(socket.id);
+    const userIdToRemove = socket["userId"];
     for (const [roomName, userJoinedRooms] of this.roomsMap.entries()) {
       if (userJoinedRooms.delete(userIdToRemove)) {
         const onlineUsersInRoom = this.getOnlineUsersInRoom(roomName);
@@ -48,6 +50,7 @@ export class EventGateway implements OnGatewayDisconnect {
       }
     }
     this.onlineUsers.delete(userIdToRemove);
+    this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
   }
 
   public getOnlineUsersInRoom(roomName: string): number[] {

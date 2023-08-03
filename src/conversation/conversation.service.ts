@@ -28,11 +28,8 @@ export class ConversationService {
       },
       include: {
         Message: {
-          orderBy: {
-            createdAt: "desc",
-          },
           include: {
-            seenUsers: { select: { id: true } },
+            seenUsers: true,
           },
         },
         users: true,
@@ -64,7 +61,7 @@ export class ConversationService {
               createdAt: "desc",
             },
             include: {
-              seenUsers: { select: { id: true } },
+              seenUsers: true,
             },
           },
           users: true,
@@ -86,11 +83,8 @@ export class ConversationService {
       },
       include: {
         Message: {
-          orderBy: {
-            createdAt: "desc",
-          },
           include: {
-            seenUsers: { select: { id: true } },
+            seenUsers: true,
           },
         },
         users: true,
