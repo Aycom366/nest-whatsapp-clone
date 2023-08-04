@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { MessageType } from "@prisma/client";
+import { MessageStatus, MessageType } from "@prisma/client";
 import { EventGateway } from "src/event/event.gateway";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -19,6 +19,55 @@ export class MessageService {
     private readonly prismaService: PrismaService,
     private readonly eventGateway: EventGateway
   ) {}
+
+  async updateMessageStatusToDeliver(loginUserId: number) {
+    // Retrieve the messages that the current user hasn't seen yet and were sent by other users and the messageStatus is not delivered
+    const unseenMessages = await this.prismaService.message.findMany({
+      where: {
+        NOT: {
+          AND: [
+            {
+              seenUsers: {
+                some: {
+                  id: loginUserId,
+                },
+              },
+            },
+            {
+              messageStatus: "Delivered",
+            },
+            {
+              messageStatus: "Read",
+            },
+          ],
+        },
+        OR: [
+          {
+            senderId: {
+              not: loginUserId,
+            },
+          },
+        ],
+      },
+    });
+
+    // Get the IDs of the unseen messages
+    const unseenMessageIds = unseenMessages.map((message) => message.id);
+
+    // Start a Prisma transaction
+    const updatedMessage = await this.prismaService.$transaction([
+      // Update the 'messageStatus' for each message
+      ...unseenMessageIds.map((messageId) =>
+        this.prismaService.message.update({
+          where: { id: messageId },
+          data: {
+            messageStatus: "Delivered",
+          },
+        })
+      ),
+    ]);
+    return updatedMessage;
+  }
 
   async sendMessage(userId: number, body: IProps) {
     const conversation = await this.prismaService.conversation.findUnique({
@@ -75,17 +124,14 @@ export class MessageService {
       where: { id: existingMessage.conversationId },
     });
 
-    const updatedSeenUsers = [
-      ...existingMessage.seenUsers.map((item) => ({ id: item.id })),
-      { id: userId },
-    ];
-
     const newMessage = await this.prismaService.message.update({
       where: { id: body.messageId },
       data: {
         messageStatus: "Read",
         seenUsers: {
-          connect: updatedSeenUsers,
+          connect: {
+            id: userId,
+          },
         },
       },
       include: {

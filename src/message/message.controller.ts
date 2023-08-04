@@ -94,6 +94,11 @@ export class MessageController {
     return this.messageService.updateMessageStatus(body, request.user.id);
   }
 
+  @Patch("/deliver")
+  updateMessageStatusToDeliver(@Request() request) {
+    return this.messageService.updateMessageStatusToDeliver(request.user.id);
+  }
+
   @Get(":conversationId")
   fetchMessages(
     @Param("conversationId", ParseIntPipe) conversationId: number,
