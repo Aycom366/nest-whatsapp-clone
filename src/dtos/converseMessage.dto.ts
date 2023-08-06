@@ -1,4 +1,4 @@
-import { MessageStatus, MessageType } from "@prisma/client";
+import { MessageType } from "@prisma/client";
 import {
   IsEnum,
   IsNotEmpty,

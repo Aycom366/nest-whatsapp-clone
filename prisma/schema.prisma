@@ -17,7 +17,9 @@ model User {
   name    String
 
   sentMessages Message[] @relation("sentMessages")
-  seenMessages Message[] @relation("seenUsers")
+  seenUsers    Message[] @relation("seenUsers")
+
+  deliveredTo Message[] @relation("deliveredTo")
 
   conversations Conversation[] @relation("users")
 }
@@ -38,8 +40,7 @@ model Message {
   senderId Int
   sender   User @relation("sentMessages", fields: [senderId], references: [id])
 
-  messageType   MessageType   @default(Text)
-  messageStatus MessageStatus @default(Sent)
+  messageType MessageType @default(Text)
 
   message   String
   createdAt DateTime @default(now())
@@ -47,17 +48,12 @@ model Message {
   conversationId Int
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
-  seenUsers User[] @relation("seenUsers")
+  seenUsers   User[] @relation("seenUsers")
+  deliveredTo User[] @relation("deliveredTo")
 }
 
 enum MessageType {
   Text
   Audio
   Image
-}
-
-enum MessageStatus {
-  Sent
-  Read
-  Delivered
 }

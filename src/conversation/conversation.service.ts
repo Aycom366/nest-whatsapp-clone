@@ -30,6 +30,7 @@ export class ConversationService {
         Message: {
           include: {
             seenUsers: true,
+            deliveredTo: true,
           },
         },
         users: true,
@@ -62,6 +63,7 @@ export class ConversationService {
             },
             include: {
               seenUsers: true,
+              deliveredTo: true,
             },
           },
           users: true,
@@ -85,6 +87,7 @@ export class ConversationService {
         Message: {
           include: {
             seenUsers: true,
+            deliveredTo: true,
           },
         },
         users: true,

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { MessageStatus, MessageType } from "@prisma/client";
+import { MessageType } from "@prisma/client";
 import { EventGateway } from "src/event/event.gateway";
 import { PrismaService } from "src/prisma/prisma.service";
 
@@ -34,10 +34,11 @@ export class MessageService {
               },
             },
             {
-              messageStatus: "Delivered",
-            },
-            {
-              messageStatus: "Read",
+              deliveredTo: {
+                some: {
+                  id: loginUserId,
+                },
+              },
             },
           ],
         },
@@ -49,24 +50,55 @@ export class MessageService {
           },
         ],
       },
+
+      include: {
+        conversation: {
+          select: {
+            name: true,
+            id: true,
+            users: true,
+          },
+        },
+        deliveredTo: { select: { id: true } },
+        seenUsers: { select: { id: true } },
+      },
     });
 
-    // Get the IDs of the unseen messages
-    const unseenMessageIds = unseenMessages.map((message) => message.id);
+    const conversationName = new Set<string>();
 
     // Start a Prisma transaction
-    const updatedMessage = await this.prismaService.$transaction([
+    const updatedMessages = await this.prismaService.$transaction([
       // Update the 'messageStatus' for each message
-      ...unseenMessageIds.map((messageId) =>
-        this.prismaService.message.update({
-          where: { id: messageId },
+      ...unseenMessages.map((message) => {
+        conversationName.add(message.conversation.name);
+        return this.prismaService.message.update({
+          where: { id: message.id },
           data: {
-            messageStatus: "Delivered",
+            deliveredTo: {
+              connect: { id: loginUserId },
+            },
           },
-        })
-      ),
+          include: {
+            conversation: {
+              select: {
+                name: true,
+              },
+            },
+            deliveredTo: true,
+            seenUsers: true,
+          },
+        });
+      }),
     ]);
-    return updatedMessage;
+
+    Array.from(conversationName).forEach(
+      (name) =>
+        this.eventGateway.server
+          .to(name)
+          .emit("messagesDeliver", updatedMessages) //send to all users connected to the room
+    );
+
+    return updatedMessages;
   }
 
   async sendMessage(userId: number, body: IProps) {
@@ -78,19 +110,24 @@ export class MessageService {
     });
     if (!conversation) throw new NotFoundException();
 
-    //Get users that are online that are in this conversation
-    const onlineUsersInRoom = this.eventGateway
-      .getOnlineUsersInRoom(conversation.name)
-      .filter((user) => user !== userId)
-      .map((item) => ({ id: item }));
-
     const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys())
       .filter((id) => id !== userId)
       .map((item) => ({ id: item }));
 
+    const usersInConversation = conversation.users.filter(
+      (user) => user.id !== userId
+    );
+
+    const onlineUserIdsInConversation = usersInConversation
+      .filter((user) =>
+        globalOnlineUsers.some((onlineUser) => onlineUser.id === user.id)
+      )
+      .map((user) => ({ id: user.id }));
+
     const message = await this.prismaService.message.create({
       include: {
         seenUsers: true,
+        deliveredTo: true,
         sender: true,
       },
 
@@ -98,9 +135,8 @@ export class MessageService {
         message: body.message,
         conversationId: conversation.id,
         senderId: userId,
-        messageStatus: globalOnlineUsers.length > 0 ? "Delivered" : "Sent",
-        seenUsers: {
-          connect: onlineUsersInRoom,
+        deliveredTo: {
+          connect: onlineUserIdsInConversation,
         },
         messageType: body.messageType,
       },
@@ -116,18 +152,33 @@ export class MessageService {
   async updateMessageStatus(body: UpdateMessageStatusProps, userId: number) {
     const existingMessage = await this.prismaService.message.findUnique({
       where: { id: body.messageId },
-      select: { seenUsers: true, conversationId: true },
+      select: {
+        conversationId: true,
+        deliveredTo: { select: { id: true } },
+        seenUsers: { select: { id: true } },
+        senderId: true,
+      },
     });
     if (!existingMessage) throw new NotFoundException();
 
     const conversationData = await this.prismaService.conversation.findUnique({
       where: { id: existingMessage.conversationId },
+      select: {
+        users: {
+          select: { id: true },
+        },
+        name: true,
+      },
     });
 
     const newMessage = await this.prismaService.message.update({
       where: { id: body.messageId },
       data: {
-        messageStatus: "Read",
+        deliveredTo: {
+          connect: {
+            id: userId,
+          },
+        },
         seenUsers: {
           connect: {
             id: userId,
@@ -137,6 +188,7 @@ export class MessageService {
       include: {
         seenUsers: true,
         sender: true,
+        deliveredTo: true,
       },
     });
 
@@ -159,11 +211,22 @@ export class MessageService {
       where: {
         conversationId,
         NOT: {
-          seenUsers: {
-            some: {
-              id: loginUserId,
+          AND: [
+            {
+              seenUsers: {
+                some: {
+                  id: loginUserId,
+                },
+              },
             },
-          },
+            {
+              deliveredTo: {
+                some: {
+                  id: loginUserId,
+                },
+              },
+            },
+          ],
         },
         OR: [
           {
@@ -173,28 +236,47 @@ export class MessageService {
           },
         ],
       },
+      include: {
+        conversation: {
+          select: {
+            name: true,
+            id: true,
+            users: true,
+          },
+        },
+        deliveredTo: { select: { id: true } },
+        seenUsers: { select: { id: true } },
+      },
     });
 
-    // Get the IDs of the unseen messages
-    const unseenMessageIds = unseenMessages.map((message) => message.id);
+    const conversationName = new Set<string>();
 
-    // Start a Prisma transaction
-    await this.prismaService.$transaction([
-      // Update the 'seenUsers' for each unseen message
-      ...unseenMessageIds.map((messageId) =>
-        this.prismaService.message.update({
-          where: { id: messageId },
+    const updatedMessages = await this.prismaService.$transaction([
+      ...unseenMessages.map((message) => {
+        return this.prismaService.message.update({
+          where: { id: message.id },
           data: {
-            messageStatus: "Read",
+            deliveredTo: {
+              connect: {
+                id: loginUserId,
+              },
+            },
             seenUsers: {
               connect: {
                 id: loginUserId,
               },
             },
           },
-        })
-      ),
+        });
+      }),
     ]);
+
+    Array.from(conversationName).forEach(
+      (name) =>
+        this.eventGateway.server
+          .to(name)
+          .emit("messagesDeliver", updatedMessages) //send to all users connected to the room
+    );
 
     const allMessages = await this.prismaService.message.findMany({
       where: {
@@ -202,6 +284,7 @@ export class MessageService {
       },
       include: {
         seenUsers: true,
+        deliveredTo: true,
         sender: true,
       },
     });
