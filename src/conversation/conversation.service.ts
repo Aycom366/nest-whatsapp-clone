@@ -98,4 +98,22 @@ export class ConversationService {
     });
     return conversation;
   }
+
+  public async getRoomsUsersIsInto(userId: number) {
+    const conversationUserIsInto =
+      await this.prismaService.conversation.findMany({
+        where: {
+          users: {
+            some: {
+              id: userId,
+            },
+          },
+        },
+        select: {
+          name: true,
+          id: true,
+        },
+      });
+    return conversationUserIsInto;
+  }
 }

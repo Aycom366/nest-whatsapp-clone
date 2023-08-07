@@ -110,19 +110,17 @@ export class MessageService {
     });
     if (!conversation) throw new NotFoundException();
 
-    const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys())
-      .filter((id) => id !== userId)
-      .map((item) => ({ id: item }));
+    const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys());
 
-    const usersInConversation = conversation.users.filter(
-      (user) => user.id !== userId
-    );
-
-    const onlineUserIdsInConversation = usersInConversation
-      .filter((user) =>
-        globalOnlineUsers.some((onlineUser) => onlineUser.id === user.id)
+    const seenUsers = globalOnlineUsers
+      .filter(
+        (id) =>
+          id !== userId &&
+          this.eventGateway.onlineUsers.get(id).data.currentChatId ===
+            conversation.id &&
+          this.eventGateway.roomsMap.get(conversation.name).has(id)
       )
-      .map((user) => ({ id: user.id }));
+      .map((id) => ({ id }));
 
     const message = await this.prismaService.message.create({
       include: {
@@ -130,13 +128,21 @@ export class MessageService {
         deliveredTo: true,
         sender: true,
       },
-
       data: {
         message: body.message,
         conversationId: conversation.id,
         senderId: userId,
         deliveredTo: {
-          connect: onlineUserIdsInConversation,
+          connect: globalOnlineUsers
+            .filter(
+              (id) =>
+                id !== userId &&
+                conversation.users.some((data) => data.id === id)
+            )
+            .map((id) => ({ id })),
+        },
+        seenUsers: {
+          connect: seenUsers,
         },
         messageType: body.messageType,
       },
@@ -167,9 +173,12 @@ export class MessageService {
         users: {
           select: { id: true },
         },
+        id: true,
         name: true,
       },
     });
+
+    const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys());
 
     const newMessage = await this.prismaService.message.update({
       where: { id: body.messageId },
@@ -180,9 +189,14 @@ export class MessageService {
           },
         },
         seenUsers: {
-          connect: {
-            id: userId,
-          },
+          connect: globalOnlineUsers
+            .filter(
+              (id) =>
+                this.eventGateway.onlineUsers.get(id).data.currentChatId ===
+                  conversationData.id &&
+                this.eventGateway.roomsMap.get(conversationData.name).has(id)
+            )
+            .map((id) => ({ id })),
         },
       },
       include: {

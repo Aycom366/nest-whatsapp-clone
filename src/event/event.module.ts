@@ -1,8 +1,9 @@
 import { Global, Module } from "@nestjs/common";
 import { EventGateway } from "./event.gateway";
+import { ConversationService } from "src/conversation/conversation.service";
 
 @Module({
-  providers: [EventGateway],
+  providers: [EventGateway, ConversationService],
   exports: [EventGateway],
 })
 export class EventModule {}
