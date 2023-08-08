@@ -4,12 +4,14 @@ import {
   WebSocketServer,
   OnGatewayDisconnect,
   SubscribeMessage,
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
 } from "@nestjs/websockets";
 import { Server } from "socket.io";
 import { ConversationService } from "src/conversation/conversation.service";
 
 @WebSocketGateway({
-  transports: ["websocket"],
   cors: "*",
 })
 export class EventGateway implements OnGatewayDisconnect {
@@ -17,50 +19,42 @@ export class EventGateway implements OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  public roomsMap: Map<string, Set<number>> = new Map();
-  public onlineUsers: Map<number, Socket> = new Map();
-  public currentChatId: number = undefined;
+  public roomsMap: Map<string, Set<number>> = new Map(); // Room Name -> Set of User IDs
+  public onlineUsers: Map<number, Socket> = new Map(); // User ID -> Socket
+  public currentChatId: Map<number, number> = new Map(); //userId -> chatId
 
   @SubscribeMessage("joinRoom")
-  joinRoom(client: Socket, payload: { userId: number; roomName: string }) {
-    const { userId, roomName } = payload;
-
-    let userJoinedRooms = this.roomsMap.get(roomName);
-
-    if (!userJoinedRooms) {
-      userJoinedRooms = new Set<number>();
-      this.roomsMap.set(roomName, userJoinedRooms);
+  joinRoom(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { roomName: string; userId: number }
+  ) {
+    const { roomName, userId } = payload;
+    if (this.roomsMap.has(roomName)) {
+      this.roomsMap.get(roomName).add(userId);
+    } else {
+      this.roomsMap.set(roomName, new Set([userId]));
     }
 
-    userJoinedRooms.add(userId);
-
-    client.data.userId = userId;
+    console.log("join room");
 
     client.join(roomName);
   }
 
-  @SubscribeMessage("setCurrentChatId")
-  setCurrentChatId(
-    client: Socket,
-    payload: { chatId: number; userId: number }
-  ) {
-    const { chatId, userId } = payload;
-
-    // Update the currentChatId property of the Socket object for the user
-
-    client.data.currentChatId = chatId;
-    client.data.userId = userId;
-
-    // Store the Socket object in the onlineUsers map
-    this.onlineUsers.set(userId, client);
-  }
-
   @SubscribeMessage("addUser")
-  async addUser(client: Socket, payload: { userId: number }) {
+  async addUser(
+    @MessageBody() payload: { userId: number },
+    @ConnectedSocket() client: Socket
+  ) {
     const { userId } = payload;
-    client.data.userId = userId; //manually set another way to identify user's socket
-    this.onlineUsers.set(Number(userId), client);
-    this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
+    console.log("clienting", client.id);
+    if (this.onlineUsers.has(userId)) {
+      const existingSocket = this.onlineUsers.get(userId);
+      // Disconnect the existing socket
+      // user might login from another browser
+      existingSocket.disconnect(true);
+    }
+    //set up this socket again
+    this.onlineUsers.set(userId, client);
 
     const conversations = await this.conversationService.getRoomsUsersIsInto(
       userId
@@ -68,38 +62,56 @@ export class EventGateway implements OnGatewayDisconnect {
 
     conversations.forEach((conversation) => {
       const payload = {
-        userId: conversation.id,
+        userId,
         roomName: conversation.name,
       };
       this.joinRoom(client, payload);
     });
-  }
 
-  handleDisconnect(socket: Socket) {
-    const userIdToRemove = socket.data.userId;
-    console.log(userIdToRemove, socket.data);
-    this.onlineUsers.delete(Number(userIdToRemove));
     this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
-    for (const [roomName, userJoinedRooms] of this.roomsMap.entries()) {
-      if (userJoinedRooms.delete(userIdToRemove)) {
-        const onlineUsersInRoom = this.getOnlineUsersInRoom(roomName);
-        this.server.to(roomName).emit("onlineUsers", onlineUsersInRoom);
-      }
-    }
   }
 
-  public getOnlineUsersInRoom(roomName: string): number[] {
-    const onlineUsersInRoom: number[] = [];
-    const userJoinedRooms = this.roomsMap.get(roomName);
+  public getUsersInRoom(roomName: string) {
+    const users = this.roomsMap.get(roomName);
+    return users ? Array.from(users) : [];
+  }
 
-    if (userJoinedRooms) {
-      for (const userId of userJoinedRooms) {
-        if (this.onlineUsers.has(userId)) {
-          onlineUsersInRoom.push(userId);
+  @SubscribeMessage("setCurrentChatId")
+  setCurrentChatId(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { chatId: number; userId: number }
+  ) {
+    const { chatId, userId } = payload;
+    this.currentChatId.set(userId, chatId);
+    console.log("changing chat", client.id, chatId);
+  }
+
+  handleDisconnect(client: Socket) {
+    console.log("disconnect", client.id);
+    const disconnectedUserId = this.getUserIdBySocket(client);
+
+    if (disconnectedUserId) {
+      this.onlineUsers.delete(disconnectedUserId);
+      this.currentChatId.delete(disconnectedUserId);
+    }
+
+    this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
+
+    // Iterate through the roomsMap to find the rooms the user is in and remove the user from those rooms.
+    this.roomsMap.forEach((userIds, roomName) => {
+      if (userIds.has(disconnectedUserId)) {
+        userIds.delete(disconnectedUserId);
+        if (userIds.size === 0) {
+          this.roomsMap.delete(roomName);
         }
       }
-    }
+    });
+  }
 
-    return onlineUsersInRoom;
+  public getUserIdBySocket(client: Socket): number | undefined {
+    const userEntry = Array.from(this.onlineUsers.entries()).find(
+      ([_, socket]) => socket.id === client.id
+    );
+    return userEntry ? userEntry[0] : undefined;
   }
 }
