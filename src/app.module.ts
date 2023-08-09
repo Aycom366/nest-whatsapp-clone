@@ -10,6 +10,7 @@ import { MessageModule } from "./message/message.module";
 import { ConversationModule } from "./conversation/conversation.module";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
+import { EventModule } from "./event/event.module";
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { join } from "path";
     UserModule,
     MessageModule,
     ConversationModule,
+    EventModule
   ],
   controllers: [AppController],
   providers: [

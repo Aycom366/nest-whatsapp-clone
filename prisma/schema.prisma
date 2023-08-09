@@ -21,14 +21,21 @@ model User {
 
   deliveredTo Message[] @relation("deliveredTo")
 
+  groupAdmins Conversation[] @relation("groupAdmins")
+
   conversations Conversation[] @relation("users")
 }
 
 model Conversation {
-  id        Int      @id @default(autoincrement())
-  name      String //groupName or name of person sending a message too
-  isGroup   Boolean  @default(false)
+  id   Int    @id @default(autoincrement())
+  name String //groupName or name of person sending a message too
+
   createdAt DateTime @default(now())
+
+  isGroup          Boolean @default(false)
+  groupDescription String?
+  avatar           String?
+  groupAdmins      User[]  @relation("groupAdmins")
 
   users   User[]    @relation("users")
   Message Message[]

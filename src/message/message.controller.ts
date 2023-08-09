@@ -21,10 +21,14 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { renameSync } from "fs";
 import { MessageType } from "@prisma/client";
+import { CloudinaryService } from "src/cloudinary/cloudinary.service";
 
 @Controller("message")
 export class MessageController {
-  constructor(private readonly messageService: MessageService) {}
+  constructor(
+    private readonly messageService: MessageService,
+    private readonly cloudinaryService: CloudinaryService
+  ) {}
 
   @Post()
   sendMessage(@Body() body: SendMessageDto, @Request() request) {
@@ -37,10 +41,10 @@ export class MessageController {
       dest: "public/images",
     })
   )
-  uploadFile(
+  async uploadFile(
     @UploadedFile(
       new ParseFilePipe({
-        validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 })],
+        validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 5 })],
         errorHttpStatusCode: 400,
       })
     )
@@ -50,12 +54,10 @@ export class MessageController {
     messageType: MessageType,
     @Request() request
   ) {
-    const fileName = "public/images/" + Date.now() + file.originalname;
-    renameSync(file.path, fileName);
-
+    const cloud = await this.cloudinaryService.uploadFile(file);
     return this.messageService.sendMessage(request.user.id, {
       conversationId,
-      message: fileName,
+      message: cloud.secure_url,
       messageType: messageType,
     });
   }

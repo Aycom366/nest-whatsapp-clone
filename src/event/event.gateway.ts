@@ -6,16 +6,20 @@ import {
   SubscribeMessage,
   ConnectedSocket,
   MessageBody,
-  OnGatewayConnection,
 } from "@nestjs/websockets";
 import { Server } from "socket.io";
 import { ConversationService } from "src/conversation/conversation.service";
+import { Inject, forwardRef } from "@nestjs/common";
 
 @WebSocketGateway({
   cors: "*",
+  transports: ["websocket"],
 })
 export class EventGateway implements OnGatewayDisconnect {
-  constructor(private readonly conversationService: ConversationService) {}
+  constructor(
+    @Inject(forwardRef(() => ConversationService))
+    private readonly conversationService: ConversationService
+  ) {}
   @WebSocketServer()
   server: Server;
 
@@ -35,8 +39,6 @@ export class EventGateway implements OnGatewayDisconnect {
       this.roomsMap.set(roomName, new Set([userId]));
     }
 
-    console.log("join room");
-
     client.join(roomName);
   }
 
@@ -46,7 +48,6 @@ export class EventGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket
   ) {
     const { userId } = payload;
-    console.log("clienting", client.id);
     if (this.onlineUsers.has(userId)) {
       const existingSocket = this.onlineUsers.get(userId);
       // Disconnect the existing socket
@@ -59,6 +60,8 @@ export class EventGateway implements OnGatewayDisconnect {
     const conversations = await this.conversationService.getRoomsUsersIsInto(
       userId
     );
+
+    console.log("clienting", client.id);
 
     conversations.forEach((conversation) => {
       const payload = {
@@ -83,12 +86,11 @@ export class EventGateway implements OnGatewayDisconnect {
   ) {
     const { chatId, userId } = payload;
     this.currentChatId.set(userId, chatId);
-    console.log("changing chat", client.id, chatId);
   }
 
   handleDisconnect(client: Socket) {
-    console.log("disconnect", client.id);
     const disconnectedUserId = this.getUserIdBySocket(client);
+    console.log("disconnecting", client.id);
 
     if (disconnectedUserId) {
       this.onlineUsers.delete(disconnectedUserId);
