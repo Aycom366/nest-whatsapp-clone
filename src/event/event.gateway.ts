@@ -11,6 +11,13 @@ import { Server } from "socket.io";
 import { ConversationService } from "src/conversation/conversation.service";
 import { Inject, forwardRef } from "@nestjs/common";
 
+interface UserData {
+  id: number;
+  name: string;
+  email: string;
+  picture: string;
+}
+
 @WebSocketGateway({
   cors: "*",
   transports: ["websocket"],
@@ -88,9 +95,62 @@ export class EventGateway implements OnGatewayDisconnect {
     this.currentChatId.set(userId, chatId);
   }
 
+  @SubscribeMessage("callUsers")
+  callUsers(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      from: UserData;
+      to: UserData[];
+      callType: "video" | "voice";
+      roomId: string;
+      signalData: any;
+    }
+  ) {
+    console.log("calling user");
+    payload.to.forEach((user) => {
+      const socket = this.onlineUsers.get(user.id);
+      if (socket) {
+        client.to(socket.id).emit(`incoming-${payload.callType}-call`, payload);
+      }
+    });
+  }
+
+  @SubscribeMessage("acceptCall")
+  acceptIncomingCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      from: UserData;
+      callType: "video" | "voice";
+      signalData: any;
+      user: UserData;
+    }
+  ) {
+    const socketinstance = this.onlineUsers.get(payload.from.id);
+    if (socketinstance) {
+      client
+        .to(socketinstance.id)
+        .emit(`${payload.callType}-accepted`, payload);
+    }
+  }
+
+  @SubscribeMessage("rejectCall")
+  rejectCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: { userId: number; callType: "video" | "voice"; name: string }
+  ) {
+    const socketinstance = this.onlineUsers.get(payload.userId);
+    if (socketinstance) {
+      return client
+        .to(socketinstance.id)
+        .emit(`${payload.callType}-rejected`, { name: payload.name });
+    }
+  }
+
   handleDisconnect(client: Socket) {
     const disconnectedUserId = this.getUserIdBySocket(client);
-    console.log("disconnecting", client.id);
 
     if (disconnectedUserId) {
       this.onlineUsers.delete(disconnectedUserId);
