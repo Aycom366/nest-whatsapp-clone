@@ -10,6 +10,7 @@ import {
 import { Server } from "socket.io";
 import { ConversationService } from "src/conversation/conversation.service";
 import { Inject, forwardRef } from "@nestjs/common";
+import { User } from "@prisma/client";
 
 @WebSocketGateway({
   cors: "*",
@@ -77,6 +78,34 @@ export class EventGateway implements OnGatewayDisconnect {
   public getUsersInRoom(roomName: string) {
     const users = this.roomsMap.get(roomName);
     return users ? Array.from(users) : [];
+  }
+
+  @SubscribeMessage("start-conversation-action")
+  startConversationAction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      conversationId: number;
+      user: User;
+      data: string;
+      roomName: string;
+    }
+  ) {
+    client.to(payload.roomName).emit("startMessageAction", payload);
+  }
+
+  @SubscribeMessage("stop-conversation-action")
+  stopConversationAction(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      conversationId: number;
+      roomName: string;
+    }
+  ) {
+    client
+      .to(payload.roomName)
+      .emit("stopMessageAction", payload.conversationId);
   }
 
   @SubscribeMessage("setCurrentChatId")
