@@ -146,8 +146,12 @@ export class ConversationService {
           include: {
             seenUsers: true,
             deliveredTo: true,
+            sender: {
+              select: { name: true },
+            },
           },
         },
+
         groupAdmins: true,
         users: true,
       },
