@@ -133,7 +133,7 @@ export class ConversationService {
   }
 
   async fetchConversations(currentLoginUserId: number) {
-    const conversation = await this.prismaService.conversation.findMany({
+    const conversations = await this.prismaService.conversation.findMany({
       where: {
         users: {
           some: {
@@ -141,6 +141,7 @@ export class ConversationService {
           },
         },
       },
+      take: 50,
       include: {
         Message: {
           include: {
@@ -159,7 +160,22 @@ export class ConversationService {
         createdAt: "desc",
       },
     });
-    return conversation;
+
+    const sortedConversations = conversations
+      .map((conversation) => {
+        const unSeenCount = conversation.Message.filter(
+          (message) =>
+            !message.seenUsers.some((user) => user.id === currentLoginUserId)
+        ).length;
+
+        return {
+          ...conversation,
+          unSeenCount,
+        };
+      })
+      .sort((a, b) => b.unSeenCount - a.unSeenCount);
+
+    return sortedConversations;
   }
 
   public async getRoomsUsersIsInto(userId: number) {

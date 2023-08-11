@@ -256,6 +256,7 @@ export class MessageService {
           },
         ],
       },
+      take: 50,
       include: {
         conversation: {
           select: {
