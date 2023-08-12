@@ -36,11 +36,7 @@ export class MessageController {
   }
 
   @Post("/file-upload/image")
-  @UseInterceptors(
-    FileInterceptor("file", {
-      dest: "public/images",
-    })
-  )
+  @UseInterceptors(FileInterceptor("file"))
   async uploadFile(
     @UploadedFile(
       new ParseFilePipe({
@@ -61,7 +57,6 @@ export class MessageController {
       messageType: messageType,
     });
   }
-
   @Post("/file-upload/audio")
   @UseInterceptors(
     FileInterceptor("audio", {
@@ -71,7 +66,7 @@ export class MessageController {
   uploadAudio(
     @UploadedFile(
       new ParseFilePipe({
-        validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 })],
+        validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 2 })],
         errorHttpStatusCode: 400,
       })
     )

@@ -148,7 +148,7 @@ export class ConversationService {
             seenUsers: true,
             deliveredTo: true,
             sender: {
-              select: { name: true },
+              select: { name: true, color: true },
             },
           },
         },

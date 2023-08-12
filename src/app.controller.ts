@@ -15,6 +15,44 @@ const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_SECRET
 );
 
+const colors = [
+  "#fc8393",
+  "#f9526d",
+  "#f6ad55",
+  "#f38927",
+  "#b5bfcc",
+  "#792604",
+  "#da610f",
+  "#aa4109",
+  "#34434b",
+  "#3ea771",
+  "#7ccfa1",
+  "#4b5b68",
+  "#13719b",
+  "#627184",
+  "#9fddbd",
+  "#f6224b",
+  "#2e825d",
+  "#1f86c6",
+  "#7b899d",
+  "#58c184",
+  "#1f5d46",
+  "#8ecbf1",
+  "#97a4b4",
+  "#3994e0",
+  "#ac99e7",
+  "#211968",
+  "#085970",
+  "#fac185",
+  "#8d71dc",
+  "#dd0939",
+  "#502fb7",
+  "#63b1e8",
+  "#ad0320",
+  "#7248d0",
+  "#7c000e",
+];
+
 @Controller()
 export class AppController {
   constructor(
@@ -41,6 +79,7 @@ export class AppController {
             email: googledata.email,
             name: googledata.name,
             picture: googledata.picture,
+            color: colors[Math.floor(Math.random() * colors.length)],
           },
         });
 

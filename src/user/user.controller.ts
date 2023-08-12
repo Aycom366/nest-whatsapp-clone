@@ -1,13 +1,9 @@
 import { Controller, Get, Request } from "@nestjs/common";
-import { UserService } from "./user.service";
 import { PrismaService } from "src/prisma/prisma.service";
 
 @Controller("user")
 export class UserController {
-  constructor(
-    private readonly userService: UserService,
-    private readonly prismaService: PrismaService
-  ) {}
+  constructor(private readonly prismaService: PrismaService) {}
 
   @Get()
   async getAllUser(@Request() request) {
