@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { User } from "@prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
 import { SharedService } from "src/shared/shared.service";
 
@@ -80,39 +81,46 @@ export class ConversationService {
     }
   }
 
-  async createGroup(
-    fileName: string,
-    name: string,
-    users: string,
-    loginUserId: number
-  ) {
-    const parsedUsers = (await JSON.parse(users)) as { id: number }[];
+  async createGroup(fileName: string, name: string, users: string, user: User) {
+    const parsedUsers = (await JSON.parse(users)) as {
+      id: number;
+      name: string;
+    }[];
 
     const conversation = await this.prismaService.conversation.create({
       data: {
         name: name + `?${Math.random()}`,
         users: {
-          connect: [...parsedUsers, { id: loginUserId }],
+          connect: [...parsedUsers, { id: user.id }],
         },
         avatar: fileName,
         groupAdmins: {
-          connect: [{ id: loginUserId }],
+          connect: [{ id: user.id }],
+        },
+        Message: {
+          create: {
+            senderId: user.id,
+            messageType: "Bot",
+            message: `created group "${name}"`,
+          },
         },
         isGroup: true,
       },
       include: {
-        groupAdmins: true,
-        Message: true,
         users: true,
+        Message: {
+          include: { sender: true },
+        },
+        groupAdmins: true,
       },
     });
 
     this.eventEmitter.emit("join.room", {
       roomName: conversation.name,
-      users: [...parsedUsers, { id: loginUserId }],
+      users: [...parsedUsers, { id: user.id }],
     });
 
-    const socketInstance = this.sharedService.onlineUsers.get(loginUserId);
+    const socketInstance = this.sharedService.onlineUsers.get(user.id);
     if (socketInstance) {
       socketInstance
         .to(conversation.name)
@@ -155,7 +163,8 @@ export class ConversationService {
       .map((conversation) => {
         const unSeenCount = conversation.Message.filter(
           (message) =>
-            !message.seenUsers.some((user) => user.id === currentLoginUserId)
+            !message.seenUsers.some((user) => user.id === currentLoginUserId) &&
+            message.messageType !== "Bot"
         ).length;
 
         return {

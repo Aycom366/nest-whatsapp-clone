@@ -7,6 +7,5 @@ import { CloudinaryModule } from "src/cloudinary/cloudinary.module";
   imports: [CloudinaryModule],
   controllers: [MessageController],
   providers: [MessageService],
-  exports: [MessageService],
 })
 export class MessageModule {}

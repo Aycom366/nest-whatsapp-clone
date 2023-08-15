@@ -79,7 +79,7 @@ export class MessageService {
 
   async updateMessageStatus(body: UpdateMessageStatusProps, userId: number) {
     const existingMessage = await this.prismaService.message.findUnique({
-      where: { id: body.messageId },
+      where: { id: body.messageId, NOT: { messageType: "Bot" } },
       select: {
         conversationId: true,
         deliveredTo: { select: { id: true } },
@@ -141,6 +141,7 @@ export class MessageService {
     const unseenMessages = await this.prismaService.message.findMany({
       where: {
         NOT: {
+          messageType: "Bot",
           AND: [
             {
               seenUsers: {
@@ -232,6 +233,7 @@ export class MessageService {
       where: {
         conversationId,
         NOT: {
+          messageType: "Bot",
           AND: [
             {
               seenUsers: {

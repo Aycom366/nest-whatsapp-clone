@@ -46,7 +46,7 @@ export class ConversationController {
       secureUrl,
       name,
       users,
-      request.user.id
+      request.user
     );
   }
 

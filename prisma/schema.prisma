@@ -45,8 +45,8 @@ model Conversation {
 model Message {
   id Int @id @default(autoincrement())
 
-  senderId Int
-  sender   User @relation("sentMessages", fields: [senderId], references: [id])
+  senderId Int?
+  sender   User? @relation("sentMessages", fields: [senderId], references: [id])
 
   messageType MessageType @default(Text)
 
@@ -61,6 +61,7 @@ model Message {
 }
 
 enum MessageType {
+  Bot
   Text
   Audio
   Image
