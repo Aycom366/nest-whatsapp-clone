@@ -1,11 +1,7 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-  forwardRef,
-} from "@nestjs/common";
-import { EventGateway } from "src/event/event.gateway";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "src/prisma/prisma.service";
+import { SharedService } from "src/shared/shared.service";
 
 interface IProp {
   userId: number;
@@ -16,9 +12,8 @@ interface IProp {
 export class ConversationService {
   constructor(
     private readonly prismaService: PrismaService,
-
-    @Inject(forwardRef(() => EventGateway))
-    private readonly eventGate: EventGateway
+    private readonly sharedService: SharedService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async accessConversation(info: IProp, currentLoginUserId: number) {
@@ -30,7 +25,7 @@ export class ConversationService {
     //check if currentLogin user in in conversation with this userId
     let chat = await this.prismaService.conversation.findFirst({
       where: {
-        isGroup: false, // Check if isGroup is false
+        isGroup: false,
         users: {
           every: {
             id: { in: [info.userId, currentLoginUserId] },
@@ -112,22 +107,17 @@ export class ConversationService {
       },
     });
 
-    //I wanna get users of this conversation that are online{Socket}
-    //then manually add them to this new conversation room
-    [...parsedUsers, { id: loginUserId }].forEach((user) => {
-      if (this.eventGate.onlineUsers.has(user.id)) {
-        this.eventGate.joinRoom(this.eventGate.onlineUsers.get(user.id), {
-          roomName: conversation.name,
-          userId: user.id,
-        });
-      }
+    this.eventEmitter.emit("join.room", {
+      roomName: conversation.name,
+      users: [...parsedUsers, { id: loginUserId }],
     });
 
-    //then broadcast this new new conversation to the room so online users will have the new chat
-    const socketInstance = this.eventGate.onlineUsers.get(loginUserId);
-    socketInstance
-      ?.to(conversation.name)
-      ?.emit("newConversation", conversation);
+    const socketInstance = this.sharedService.onlineUsers.get(loginUserId);
+    if (socketInstance) {
+      socketInstance
+        .to(conversation.name)
+        .emit("newConversation", conversation);
+    }
 
     return conversation;
   }

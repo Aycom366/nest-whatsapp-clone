@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { MessageType } from "@prisma/client";
-import { EventGateway } from "src/event/event.gateway";
 import { PrismaService } from "src/prisma/prisma.service";
+import { SharedService } from "src/shared/shared.service";
 
 interface IProps {
   messageType?: MessageType;
@@ -17,7 +18,8 @@ interface UpdateMessageStatusProps {
 export class MessageService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly eventGateway: EventGateway
+    private readonly sharedService: SharedService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async sendMessage(userId: number, body: IProps) {
@@ -29,14 +31,14 @@ export class MessageService {
     });
     if (!conversation) throw new NotFoundException();
 
-    const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys());
+    const globalOnlineUsers = Array.from(this.sharedService.onlineUsers.keys());
 
     const seenUsers = globalOnlineUsers
       .filter(
         (id) =>
           id !== userId &&
-          this.eventGateway.currentChatId.get(id) === conversation.id &&
-          this.eventGateway.roomsMap.get(conversation.name).has(id)
+          this.sharedService.currentChatId.get(id) === conversation.id &&
+          this.sharedService.roomsMap.get(conversation.name).has(id)
       )
       .map((id) => ({ id }));
 
@@ -66,7 +68,8 @@ export class MessageService {
       },
     });
 
-    const socketInstance = this.eventGateway.onlineUsers.get(userId);
+    //Emit handleMessageSEndingtoClienthere
+    const socketInstance = this.sharedService.onlineUsers.get(userId);
 
     if (socketInstance)
       socketInstance.to(conversation.name).emit("messageReceived", message);
@@ -97,14 +100,14 @@ export class MessageService {
       },
     });
 
-    const globalOnlineUsers = Array.from(this.eventGateway.onlineUsers.keys());
+    const globalOnlineUsers = Array.from(this.sharedService.onlineUsers.keys());
 
     const seenUsers = globalOnlineUsers
       .filter(
         (id) =>
-          this.eventGateway.currentChatId.get(id) === conversationData.id &&
+          this.sharedService.currentChatId.get(id) === conversationData.id &&
           existingMessage.senderId !== id &&
-          this.eventGateway.roomsMap.get(conversationData.name).has(id)
+          this.sharedService.roomsMap.get(conversationData.name).has(id)
       )
       .map((id) => ({ id }));
 
@@ -127,10 +130,10 @@ export class MessageService {
       },
     });
 
-    //send an emit event to everyone including the user who update
-    this.eventGateway.server
-      .to(conversationData.name)
-      .emit("updateMessageStatus", newMessage);
+    this.eventEmitter.emit("messages.updated", {
+      roomName: conversationData.name,
+      updatedMessages: newMessage,
+    });
   }
 
   async updateMessageStatusToDeliver(loginUserId: number) {
@@ -208,12 +211,10 @@ export class MessageService {
       }),
     ]);
 
-    Array.from(conversationName).forEach(
-      (name) =>
-        this.eventGateway.server
-          .to(name)
-          .emit("messagesDeliver", updatedMessages) //send to all users connected to the room
-    );
+    this.eventEmitter.emit("messages.deliver", {
+      roomNames: Array.from(conversationName),
+      updatedMessages,
+    });
 
     return updatedMessages;
   }
@@ -302,12 +303,12 @@ export class MessageService {
       }),
     ]);
 
-    Array.from(conversationName).forEach(
-      (name) =>
-        this.eventGateway.server
-          .to(name)
-          .emit("messagesDeliver", updatedMessages) //send to all users connected to the room
-    );
+    Array.from(conversationName).forEach((name) => {
+      const socketInstance = this.sharedService.onlineUsers.get(loginUserId);
+      if (socketInstance) {
+        socketInstance.to(name).emit("messagesDeliver", updatedMessages);
+      }
+    });
 
     const allMessages = await this.prismaService.message.findMany({
       where: {

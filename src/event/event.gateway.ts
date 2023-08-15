@@ -9,8 +9,9 @@ import {
 } from "@nestjs/websockets";
 import { Server } from "socket.io";
 import { ConversationService } from "src/conversation/conversation.service";
-import { Inject, forwardRef } from "@nestjs/common";
 import { User } from "@prisma/client";
+import { SharedService } from "src/shared/shared.service";
+import { OnEvent } from "@nestjs/event-emitter";
 
 @WebSocketGateway({
   cors: "*",
@@ -18,15 +19,12 @@ import { User } from "@prisma/client";
 })
 export class EventGateway implements OnGatewayDisconnect {
   constructor(
-    @Inject(forwardRef(() => ConversationService))
-    private readonly conversationService: ConversationService
+    private readonly conversationService: ConversationService,
+    private readonly sharedService: SharedService
   ) {}
+
   @WebSocketServer()
   server: Server;
-
-  public roomsMap: Map<string, Set<number>> = new Map(); // Room Name -> Set of User IDs
-  public onlineUsers: Map<number, Socket> = new Map(); // User ID -> Socket
-  public currentChatId: Map<number, number> = new Map(); //userId -> chatId
 
   @SubscribeMessage("joinRoom")
   joinRoom(
@@ -34,10 +32,10 @@ export class EventGateway implements OnGatewayDisconnect {
     @MessageBody() payload: { roomName: string; userId: number }
   ) {
     const { roomName, userId } = payload;
-    if (this.roomsMap.has(roomName)) {
-      this.roomsMap.get(roomName).add(userId);
+    if (this.sharedService.roomsMap.has(roomName)) {
+      this.sharedService.roomsMap.get(roomName).add(userId);
     } else {
-      this.roomsMap.set(roomName, new Set([userId]));
+      this.sharedService.roomsMap.set(roomName, new Set([userId]));
     }
 
     client.join(roomName);
@@ -49,14 +47,14 @@ export class EventGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket
   ) {
     const { userId } = payload;
-    if (this.onlineUsers.has(userId)) {
-      const existingSocket = this.onlineUsers.get(userId);
+    if (this.sharedService.onlineUsers.has(userId)) {
+      const existingSocket = this.sharedService.onlineUsers.get(userId);
       // Disconnect the existing socket
       // user might login from another browser
       existingSocket.disconnect(true);
     }
     //set up this socket again
-    this.onlineUsers.set(userId, client);
+    this.sharedService.onlineUsers.set(userId, client);
 
     const conversations = await this.conversationService.getRoomsUsersIsInto(
       userId
@@ -72,11 +70,14 @@ export class EventGateway implements OnGatewayDisconnect {
       this.joinRoom(client, payload);
     });
 
-    this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
+    this.server.emit(
+      "onlineUsers",
+      Array.from(this.sharedService.onlineUsers.keys())
+    );
   }
 
   public getUsersInRoom(roomName: string) {
-    const users = this.roomsMap.get(roomName);
+    const users = this.sharedService.roomsMap.get(roomName);
     return users ? Array.from(users) : [];
   }
 
@@ -109,40 +110,67 @@ export class EventGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage("setCurrentChatId")
-  setCurrentChatId(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() payload: { chatId: number; userId: number }
-  ) {
+  setCurrentChatId(@MessageBody() payload: { chatId: number; userId: number }) {
     const { chatId, userId } = payload;
-    this.currentChatId.set(userId, chatId);
+    this.sharedService.currentChatId.set(userId, chatId);
   }
 
   handleDisconnect(client: Socket) {
-    const disconnectedUserId = this.getUserIdBySocket(client);
+    const disconnectedUserId = this.sharedService.getUserIdBySocket(client);
     console.log("disconnecting", client.id);
 
     if (disconnectedUserId) {
-      this.onlineUsers.delete(disconnectedUserId);
-      this.currentChatId.delete(disconnectedUserId);
+      this.sharedService.onlineUsers.delete(disconnectedUserId);
+      this.sharedService.onlineUsers.delete(disconnectedUserId);
     }
 
-    this.server.emit("onlineUsers", Array.from(this.onlineUsers.keys()));
+    this.server.emit(
+      "onlineUsers",
+      Array.from(this.sharedService.onlineUsers.keys())
+    );
 
-    // Iterate through the roomsMap to find the rooms the user is in and remove the user from those rooms.
-    this.roomsMap.forEach((userIds, roomName) => {
+    // Iterate through the sharedService.roomsMap to find the rooms the user is in and remove the user from those rooms.
+    this.sharedService.roomsMap.forEach((userIds, roomName) => {
       if (userIds.has(disconnectedUserId)) {
         userIds.delete(disconnectedUserId);
         if (userIds.size === 0) {
-          this.roomsMap.delete(roomName);
+          this.sharedService.roomsMap.delete(roomName);
         }
       }
     });
   }
 
-  public getUserIdBySocket(client: Socket): number | undefined {
-    const userEntry = Array.from(this.onlineUsers.entries()).find(
-      ([_, socket]) => socket.id === client.id
+  /**Event Emitters**/
+  @OnEvent("join.room")
+  addUsersToRoom(payload: { roomName: string; users: { id: number }[] }) {
+    const { roomName, users } = payload;
+    users.forEach((user) => {
+      if (this.sharedService.onlineUsers.has(user.id)) {
+        this.joinRoom(this.sharedService.onlineUsers.get(user.id), {
+          roomName,
+          userId: user.id,
+        });
+      }
+    });
+  }
+
+  @OnEvent("messages.updated")
+  sendUpdateMessagesToConnectedSockets(payload: {
+    roomName: string;
+    updatedMessages: any;
+  }) {
+    const { roomName, updatedMessages } = payload;
+    this.server.to(roomName).emit("updateMessageStatus", updatedMessages);
+  }
+
+  @OnEvent("messages.deliver")
+  sendDeliverStatusToConnectedSockets(payload: {
+    roomNames: string[];
+    updatedMessages: any;
+  }) {
+    const { roomNames, updatedMessages } = payload;
+    roomNames.forEach((room) =>
+      this.server.to(room).emit("messagesDeliver", updatedMessages)
     );
-    return userEntry ? userEntry[0] : undefined;
   }
 }

@@ -8,15 +8,13 @@ import { APP_GUARD } from "@nestjs/core";
 import { AuthGuard } from "./guards/auth.guards";
 import { MessageModule } from "./message/message.module";
 import { ConversationModule } from "./conversation/conversation.module";
-import { ServeStaticModule } from "@nestjs/serve-static";
-import { join } from "path";
+import { SharedModule } from "./shared/shared.module";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 import { EventModule } from "./event/event.module";
 
 @Module({
   imports: [
-    ServeStaticModule.forRoot({
-      rootPath: join(__dirname, "..", "public"),
-    }),
+    EventEmitterModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -25,11 +23,12 @@ import { EventModule } from "./event/event.module";
       secret: process.env.SECRET,
       signOptions: { expiresIn: "1d" },
     }),
+    SharedModule,
     PrismaModule,
     UserModule,
     MessageModule,
     ConversationModule,
-    EventModule
+    EventModule,
   ],
   controllers: [AppController],
   providers: [

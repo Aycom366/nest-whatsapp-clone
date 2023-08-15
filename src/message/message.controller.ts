@@ -19,7 +19,6 @@ import {
   UpdateMessageStatus,
 } from "src/dtos/converseMessage.dto";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { renameSync } from "fs";
 import { MessageType } from "@prisma/client";
 import { CloudinaryService } from "src/cloudinary/cloudinary.service";
 
@@ -58,12 +57,8 @@ export class MessageController {
     });
   }
   @Post("/file-upload/audio")
-  @UseInterceptors(
-    FileInterceptor("audio", {
-      dest: "public/audio",
-    })
-  )
-  uploadAudio(
+  @UseInterceptors(FileInterceptor("audio"))
+  async uploadAudio(
     @UploadedFile(
       new ParseFilePipe({
         validators: [new MaxFileSizeValidator({ maxSize: 1024 * 1024 * 2 })],
@@ -76,12 +71,10 @@ export class MessageController {
     messageType: MessageType,
     @Request() request
   ) {
-    const fileName = "public/audio/" + Date.now() + file.originalname;
-    renameSync(file.path, fileName);
-
+    const cloud = await this.cloudinaryService.uploadFile(file);
     return this.messageService.sendMessage(request.user.id, {
       conversationId,
-      message: fileName,
+      message: cloud.secure_url,
       messageType: messageType,
     });
   }
