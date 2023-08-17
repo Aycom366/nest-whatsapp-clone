@@ -2,7 +2,6 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { User } from "@prisma/client";
 import { PrismaService } from "src/prisma/prisma.service";
-import { SharedService } from "src/shared/shared.service";
 
 interface IProp {
   userId: number;
@@ -13,7 +12,6 @@ interface IProp {
 export class ConversationService {
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly sharedService: SharedService,
     private readonly eventEmitter: EventEmitter2
   ) {}
 
@@ -77,6 +75,12 @@ export class ConversationService {
         },
       });
 
+      this.eventEmitter.emit("join.room", {
+        conversation: chat,
+        roomName: chat.name,
+        users: [{ id: info.userId }, { id: currentLoginUserId }],
+      });
+
       return chat;
     }
   }
@@ -97,6 +101,7 @@ export class ConversationService {
         groupAdmins: {
           connect: [{ id: user.id }],
         },
+        createdById: user.id,
         Message: {
           create: {
             senderId: user.id,
@@ -104,28 +109,24 @@ export class ConversationService {
             message: `created group "${name}"`,
           },
         },
+
         isGroup: true,
       },
       include: {
         users: true,
         Message: {
-          include: { sender: true },
+          include: { sender: true, deliveredTo: true, seenUsers: true },
         },
         groupAdmins: true,
+        createdBy: { select: { name: true, id: true } },
       },
     });
 
     this.eventEmitter.emit("join.room", {
       roomName: conversation.name,
       users: [...parsedUsers, { id: user.id }],
+      conversation,
     });
-
-    const socketInstance = this.sharedService.onlineUsers.get(user.id);
-    if (socketInstance) {
-      socketInstance
-        .to(conversation.name)
-        .emit("newConversation", conversation);
-    }
 
     return conversation;
   }
@@ -153,6 +154,7 @@ export class ConversationService {
 
         groupAdmins: true,
         users: true,
+        createdBy: { select: { name: true, id: true } },
       },
       orderBy: {
         createdAt: "desc",

@@ -33,6 +33,10 @@ export class MessageService {
 
     const globalOnlineUsers = Array.from(this.sharedService.onlineUsers.keys());
 
+    console.log(this.sharedService.currentChatId);
+    console.log(this.sharedService.onlineUsers.keys());
+    console.log(this.sharedService.roomsMap);
+
     const seenUsers = globalOnlineUsers
       .filter(
         (id) =>
