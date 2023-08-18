@@ -162,6 +162,36 @@ export class EventGateway implements OnGatewayDisconnect {
     }
   }
 
+  @OnEvent("room.update")
+  updateRooms(payload: {
+    conversation: any;
+    oldRoomName: string;
+    newRoomName: string;
+    userThatInitiate: number;
+    users: { id: number }[];
+  }) {
+    const { newRoomName, oldRoomName, users, userThatInitiate, conversation } =
+      payload;
+    this.sharedService.roomsMap.delete(oldRoomName);
+
+    users.forEach((user) => {
+      if (this.sharedService.onlineUsers.has(user.id)) {
+        this.joinRoom(this.sharedService.onlineUsers.get(user.id), {
+          roomName: newRoomName,
+          userId: user.id,
+        });
+      }
+    });
+
+    const socketInstance = this.sharedService.onlineUsers.get(userThatInitiate);
+
+    if (socketInstance) {
+      socketInstance
+        .to(newRoomName)
+        .emit("updateConversationInformation", conversation);
+    }
+  }
+
   @OnEvent("messages.updated")
   sendUpdateMessagesToConnectedSockets(payload: {
     roomName: string;
