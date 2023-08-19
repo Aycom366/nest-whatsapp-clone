@@ -46,6 +46,7 @@ export class MessageService {
       include: {
         seenUsers: true,
         deliveredTo: true,
+        BotMessageTo: true,
         sender: true,
       },
       data: {
@@ -79,7 +80,7 @@ export class MessageService {
 
   async updateMessageStatus(body: UpdateMessageStatusProps, userId: number) {
     const existingMessage = await this.prismaService.message.findUnique({
-      where: { id: body.messageId },
+      where: { id: body.messageId, NOT: { messageType: "Bot" } },
       select: {
         conversationId: true,
         deliveredTo: { select: { id: true } },
@@ -127,6 +128,7 @@ export class MessageService {
         seenUsers: true,
         sender: true,
         deliveredTo: true,
+        BotMessageTo: true,
       },
     });
 
@@ -141,6 +143,7 @@ export class MessageService {
     const unseenMessages = await this.prismaService.message.findMany({
       where: {
         NOT: {
+          messageType: "Bot",
           AND: [
             {
               seenUsers: {
@@ -177,6 +180,7 @@ export class MessageService {
         },
         deliveredTo: { select: { id: true } },
         seenUsers: { select: { id: true } },
+        BotMessageTo: true,
       },
     });
 
@@ -232,6 +236,7 @@ export class MessageService {
       where: {
         conversationId,
         NOT: {
+          messageType: "Bot",
           AND: [
             {
               seenUsers: {
@@ -298,6 +303,7 @@ export class MessageService {
           include: {
             deliveredTo: true,
             seenUsers: true,
+            BotMessageTo: true,
           },
         });
       }),
@@ -317,6 +323,7 @@ export class MessageService {
       include: {
         seenUsers: true,
         deliveredTo: true,
+        BotMessageTo: true,
         sender: true,
       },
     });

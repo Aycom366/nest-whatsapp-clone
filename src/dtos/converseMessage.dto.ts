@@ -1,11 +1,14 @@
 import { MessageType } from "@prisma/client";
+import { Type } from "class-transformer";
 import {
+  IsArray,
   IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsPositive,
   IsString,
+  ValidateNested,
 } from "class-validator";
 
 export class CreateSingleConversation {
@@ -16,6 +19,23 @@ export class CreateSingleConversation {
   @IsString()
   @IsNotEmpty()
   name?: string;
+}
+
+export class ParticipantDto {
+  @IsNumber()
+  @IsPositive()
+  userId: number;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+}
+
+export class AddParticipantsDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ParticipantDto)
+  participants: ParticipantDto[];
 }
 
 export class UpdateMessageStatus {

@@ -17,8 +17,10 @@ model User {
   name    String
   color   String
 
-  sentMessages Message[] @relation("sentMessages")
-  seenUsers    Message[] @relation("seenUsers")
+  sentMessages Message[]      @relation("sentMessages")
+  BotMessageTo Message[]      @relation("BotMessageTo")
+  seenUsers    Message[]      @relation("seenUsers")
+  createdBy    Conversation[] @relation("createdBy")
 
   deliveredTo Message[] @relation("deliveredTo")
 
@@ -38,6 +40,9 @@ model Conversation {
   avatar           String?
   groupAdmins      User[]  @relation("groupAdmins")
 
+  createdById Int?
+  createdBy   User? @relation("createdBy", fields: [createdById], references: [id])
+
   users   User[]    @relation("users")
   Message Message[]
 }
@@ -45,8 +50,11 @@ model Conversation {
 model Message {
   id Int @id @default(autoincrement())
 
-  senderId Int
-  sender   User @relation("sentMessages", fields: [senderId], references: [id])
+  senderId Int?
+  sender   User? @relation("sentMessages", fields: [senderId], references: [id])
+
+  BotMessageToId Int?
+  BotMessageTo   User? @relation("BotMessageTo", fields: [BotMessageToId], references: [id])
 
   messageType MessageType @default(Text)
 
@@ -61,6 +69,7 @@ model Message {
 }
 
 enum MessageType {
+  Bot
   Text
   Audio
   Image

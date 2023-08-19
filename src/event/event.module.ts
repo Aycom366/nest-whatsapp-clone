@@ -1,4 +1,4 @@
-import { Module, forwardRef } from "@nestjs/common";
+import { Module } from "@nestjs/common";
 import { EventGateway } from "./event.gateway";
 import { ConversationModule } from "src/conversation/conversation.module";
 
