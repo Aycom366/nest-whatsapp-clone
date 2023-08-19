@@ -2,6 +2,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { User } from "@prisma/client";
@@ -31,6 +32,63 @@ export class ConversationService {
     private readonly eventEmitter: EventEmitter2
   ) {}
 
+  async updateAdmin(
+    body: { name: string; userId: number },
+    conversationId: number,
+    type: "add" | "remove",
+    loggedInUser: number
+  ) {
+    const conversation = await this.prismaService.conversation.update({
+      where: {
+        id: conversationId,
+        groupAdmins: { some: { id: loggedInUser } },
+      },
+      data: {
+        groupAdmins:
+          type === "add"
+            ? {
+                connect: { id: body.userId },
+              }
+            : {
+                disconnect: { id: body.userId },
+              },
+        Message: {
+          create: {
+            senderId: loggedInUser,
+            messageType: "Bot",
+            message: type === "add" ? "now an Admin" : "no longer an Admin",
+            BotMessageToId: body.userId,
+          },
+        },
+      },
+      include: {
+        groupAdmins: true,
+
+        Message: {
+          take: 1,
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            seenUsers: true,
+            deliveredTo: true,
+            BotMessageTo: true,
+            sender: true,
+          },
+        },
+      },
+    });
+    if (conversation) {
+      const socketInstane = this.sharedService.onlineUsers.get(loggedInUser);
+      if (socketInstane)
+        socketInstane
+          .to(conversation.name)
+          .emit("updateConversationInformation", conversation);
+    }
+
+    return conversation;
+  }
+
   async accessConversation(info: IProp, currentLoginUserId: number) {
     const user = await this.prismaService.user.findUnique({
       where: { id: info.userId },
@@ -52,6 +110,7 @@ export class ConversationService {
           include: {
             seenUsers: true,
             deliveredTo: true,
+            BotMessageTo: true,
           },
         },
         users: true,
@@ -85,6 +144,7 @@ export class ConversationService {
             include: {
               seenUsers: true,
               deliveredTo: true,
+              BotMessageTo: true,
             },
           },
           users: true,
@@ -98,6 +158,67 @@ export class ConversationService {
       });
 
       return chat;
+    }
+  }
+
+  async exitGroup(
+    body: { name: string; userId: number },
+    conversationId: number
+  ) {
+    const conversation = await this.prismaService.conversation.findUnique({
+      where: { id: conversationId },
+      include: { groupAdmins: true, users: true },
+    });
+    if (!conversation) throw new NotFoundException();
+
+    if (
+      conversation.groupAdmins.find((user) => user.id === body.userId) &&
+      conversation.groupAdmins.length === 1 &&
+      conversation.users.length > 1
+    )
+      throw new UnprocessableEntityException(
+        "Please make another user an admin before exiting the group"
+      );
+
+    const newConversation = await this.prismaService.conversation.update({
+      where: { id: conversationId },
+      data: {
+        users: { disconnect: { id: body.userId } },
+        groupAdmins: { disconnect: { id: body.userId } },
+        Message: {
+          create: {
+            senderId: body.userId,
+            messageType: "Bot",
+            message: "left groupchat",
+          },
+        },
+      },
+      include: {
+        users: true,
+        groupAdmins: true,
+        Message: {
+          take: 1,
+          orderBy: {
+            createdAt: "desc",
+          },
+          include: {
+            seenUsers: true,
+            deliveredTo: true,
+            BotMessageTo: true,
+            sender: true,
+          },
+        },
+      },
+    });
+
+    if (newConversation) {
+      this.eventEmitter.emit("room.removeUser", {
+        roomName: conversation.name,
+        users: [{ id: body.userId }, { id: body.userId }],
+        conversation: newConversation,
+      });
+
+      return newConversation;
     }
   }
 
@@ -127,6 +248,12 @@ export class ConversationService {
           orderBy: {
             createdAt: "desc",
           },
+          include: {
+            seenUsers: true,
+            deliveredTo: true,
+            BotMessageTo: true,
+            sender: true,
+          },
         },
       },
     });
@@ -142,11 +269,21 @@ export class ConversationService {
     return updatedConversation;
   }
 
-  async addParticipants(
+  async updateConversationParticipants(
     userId: number,
+    action: "add" | "remove",
     conversationId: number,
     body: { participants: { userId: number; name: string }[] }
   ) {
+    let message = "";
+    if (body.participants.length > 1) {
+      const names = body.participants.map((user) => user.name);
+      const lastParticipant = names.pop();
+      message = `added ${names.join(", ")} and ${lastParticipant}`;
+    } else if (body.participants.length === 1) {
+      message = `added ${body.participants[0].name}`;
+    }
+
     const conversation = await this.prismaService.conversation.update({
       where: {
         id: conversationId,
@@ -155,32 +292,38 @@ export class ConversationService {
         },
       },
       data: {
-        users: {
-          connect: body.participants.map((user) => ({ id: user.userId })),
-        },
+        users:
+          action === "add"
+            ? {
+                connect: body.participants.map((user) => ({ id: user.userId })),
+              }
+            : { disconnect: { id: body.participants[0].userId } },
+        groupAdmins:
+          action === "remove"
+            ? { disconnect: { id: body.participants[0].userId } }
+            : {},
         Message: {
           create: {
             senderId: userId,
             messageType: "Bot",
             message:
-              body.participants.length > 1
-                ? `added ${body.participants
-                    .map((user, index) => {
-                      if (index === body.participants.length - 1) {
-                        return `and ${user.name}`;
-                      } else {
-                        return user.name;
-                      }
-                    })
-                    .join(", ")}`
-                : `added ${body.participants[0].name}`,
+              action === "add"
+                ? message
+                : `removed ${body.participants[0].name}`,
           },
         },
       },
 
       include: {
         users: true,
+        groupAdmins: true,
         Message: {
+          include: {
+            seenUsers: true,
+            deliveredTo: true,
+            BotMessageTo: true,
+            sender: true,
+          },
           take: 1,
           orderBy: {
             createdAt: "desc",
@@ -190,23 +333,32 @@ export class ConversationService {
     });
 
     if (conversation) {
-      const socketInstance = this.sharedService.onlineUsers.get(userId);
-      if (socketInstance) {
-        socketInstance
-          .to(conversation.name)
-          .emit("updateConversationInformation", conversation);
+      if (action === "add") {
+        const socketInstance = this.sharedService.onlineUsers.get(userId);
+        if (socketInstance) {
+          socketInstance
+            .to(conversation.name)
+            .emit("updateConversationInformation", conversation);
+        }
+
+        this.eventEmitter.emit("join.room", {
+          roomName: conversation.name,
+          users: [
+            ...body.participants.map((user) => ({ id: user.userId })),
+            { id: userId },
+          ],
+          conversation,
+        });
+      } else {
+        this.eventEmitter.emit("room.removeUser", {
+          roomName: conversation.name,
+          users: [{ id: body.participants[0].userId }, { id: userId }],
+          conversation,
+        });
       }
 
-      this.eventEmitter.emit("join.room", {
-        roomName: conversation.name,
-        users: [
-          ...body.participants.map((user) => ({ id: user.userId })),
-          { id: userId },
-        ],
-        conversation,
-      });
+      return conversation;
     }
-    return conversation;
   }
 
   async updateConversation(payload: UpdateProps) {
@@ -254,6 +406,12 @@ export class ConversationService {
       },
       include: {
         Message: {
+          include: {
+            seenUsers: true,
+            deliveredTo: true,
+            BotMessageTo: true,
+            sender: true,
+          },
           take: 1,
           orderBy: {
             createdAt: "desc",
@@ -312,7 +470,12 @@ export class ConversationService {
       include: {
         users: true,
         Message: {
-          include: { sender: true, deliveredTo: true, seenUsers: true },
+          include: {
+            sender: true,
+            deliveredTo: true,
+            seenUsers: true,
+            BotMessageTo: true,
+          },
         },
         groupAdmins: true,
         createdBy: { select: { name: true, id: true } },
@@ -343,6 +506,7 @@ export class ConversationService {
           include: {
             seenUsers: true,
             deliveredTo: true,
+            BotMessageTo: true,
             sender: {
               select: { name: true, color: true },
             },

@@ -33,10 +33,6 @@ export class MessageService {
 
     const globalOnlineUsers = Array.from(this.sharedService.onlineUsers.keys());
 
-    console.log(this.sharedService.currentChatId);
-    console.log(this.sharedService.onlineUsers.keys());
-    console.log(this.sharedService.roomsMap);
-
     const seenUsers = globalOnlineUsers
       .filter(
         (id) =>
@@ -50,6 +46,7 @@ export class MessageService {
       include: {
         seenUsers: true,
         deliveredTo: true,
+        BotMessageTo: true,
         sender: true,
       },
       data: {
@@ -131,6 +128,7 @@ export class MessageService {
         seenUsers: true,
         sender: true,
         deliveredTo: true,
+        BotMessageTo: true,
       },
     });
 
@@ -182,6 +180,7 @@ export class MessageService {
         },
         deliveredTo: { select: { id: true } },
         seenUsers: { select: { id: true } },
+        BotMessageTo: true,
       },
     });
 
@@ -304,6 +303,7 @@ export class MessageService {
           include: {
             deliveredTo: true,
             seenUsers: true,
+            BotMessageTo: true,
           },
         });
       }),
@@ -323,6 +323,7 @@ export class MessageService {
       include: {
         seenUsers: true,
         deliveredTo: true,
+        BotMessageTo: true,
         sender: true,
       },
     });

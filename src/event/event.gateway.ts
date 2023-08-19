@@ -137,6 +137,23 @@ export class EventGateway implements OnGatewayDisconnect {
   }
 
   /**Event Emitters**/
+  @OnEvent("room.removeUser")
+  removeUserFromRoom(payload: {
+    roomName: string;
+    users: { id: number }[];
+    conversation: any;
+  }) {
+    const { roomName, users, conversation } = payload;
+    const socketInstance = this.sharedService.onlineUsers.get(users[1].id);
+    if (socketInstance) {
+      socketInstance
+        .to(roomName)
+        .emit("updateConversationInformation", conversation);
+    }
+
+    this.sharedService.roomsMap.get(roomName).delete(users[0].id);
+  }
+
   @OnEvent("join.room")
   addUsersToRoom(payload: {
     conversation: any;

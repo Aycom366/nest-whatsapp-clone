@@ -18,6 +18,7 @@ model User {
   color   String
 
   sentMessages Message[]      @relation("sentMessages")
+  BotMessageTo Message[]      @relation("BotMessageTo")
   seenUsers    Message[]      @relation("seenUsers")
   createdBy    Conversation[] @relation("createdBy")
 
@@ -51,6 +52,9 @@ model Message {
 
   senderId Int?
   sender   User? @relation("sentMessages", fields: [senderId], references: [id])
+
+  BotMessageToId Int?
+  BotMessageTo   User? @relation("BotMessageTo", fields: [BotMessageToId], references: [id])
 
   messageType MessageType @default(Text)
 

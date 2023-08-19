@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Request,
   UploadedFile,
   UseInterceptors,
@@ -18,6 +19,7 @@ import { ConversationService } from "./conversation.service";
 import {
   AddParticipantsDto,
   CreateSingleConversation,
+  ParticipantDto,
 } from "src/dtos/converseMessage.dto";
 import { CloudinaryService } from "src/cloudinary/cloudinary.service";
 import { FileInterceptor } from "@nestjs/platform-express";
@@ -38,16 +40,41 @@ export class ConversationController {
     return this.conversationService.accessConversation(body, request.user.id);
   }
 
-  @Patch("participant/add/:conversationId")
-  addParticipants(
+  @Patch("participant/:conversationId")
+  updateConversationParticipants(
     @Body(ValidationPipe) body: AddParticipantsDto,
+    @Query("action") action: "add" | "remove",
     @Param("conversationId", ParseIntPipe) conversationId: number,
     @Request() request
   ) {
-    return this.conversationService.addParticipants(
+    return this.conversationService.updateConversationParticipants(
       request.user.id,
+      action,
       conversationId,
       body
+    );
+  }
+
+  @Patch("participant/exit/:conversationId")
+  exitGroup(
+    @Body() body: ParticipantDto,
+    @Param("conversationId", ParseIntPipe) conversationId: number
+  ) {
+    return this.conversationService.exitGroup(body, conversationId);
+  }
+
+  @Patch("/admin/:conversationId")
+  updateAdmin(
+    @Body() body: ParticipantDto,
+    @Query("type") type: "add" | "remove",
+    @Param("conversationId", ParseIntPipe) conversationId: number,
+    @Request() request
+  ) {
+    return this.conversationService.updateAdmin(
+      body,
+      conversationId,
+      type,
+      request.user.id
     );
   }
 

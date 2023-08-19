@@ -21,7 +21,7 @@ export class CreateSingleConversation {
   name?: string;
 }
 
-class ParticipantDto {
+export class ParticipantDto {
   @IsNumber()
   @IsPositive()
   userId: number;
