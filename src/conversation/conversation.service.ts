@@ -32,6 +32,29 @@ export class ConversationService {
     private readonly eventEmitter: EventEmitter2
   ) {}
 
+  async SaveBotMessage(
+    conversationId: number,
+    BotMessageToId: number,
+    message: string
+  ) {
+    const newMessage = await this.prismaService.message.create({
+      data: {
+        conversationId,
+        message,
+        messageType: "Bot",
+        BotMessageToId,
+      },
+      include: {
+        seenUsers: true,
+        deliveredTo: true,
+        BotMessageTo: true,
+        sender: true,
+      },
+    });
+
+    return newMessage;
+  }
+
   async updateAdmin(
     body: { name: string; userId: number },
     conversationId: number,
@@ -56,7 +79,10 @@ export class ConversationService {
           create: {
             senderId: loggedInUser,
             messageType: "Bot",
-            message: type === "add" ? "now an Admin" : "no longer an Admin",
+            message:
+              type === "add"
+                ? "You are now an Admin"
+                : "You are no longer an Admin",
             BotMessageToId: body.userId,
           },
         },
