@@ -279,21 +279,21 @@ export class EventGateway implements OnGatewayDisconnect {
     const toSocketInstance = this.sharedService.onlineUsers.get(payload.to);
     if (toSocketInstance) {
       client.to(toSocketInstance.id).emit("cancel-video-calling", payload);
-    }
-    const message = await this.conversationService.SaveBotMessage(
-      payload.conversationId,
-      payload.to,
-      `${videoSvg} Missed Video call at ${new Date(payload.date).toLocaleString(
-        "en-US",
-        {
+
+      const message = await this.conversationService.SaveBotMessage(
+        payload.conversationId,
+        payload.to,
+        `${videoSvg} Missed Video call at ${new Date(
+          payload.date
+        ).toLocaleString("en-US", {
           hour: "numeric",
           minute: "numeric",
           hour12: false,
-        }
-      )}`
-    );
+        })}`
+      );
 
-    client.to(toSocketInstance.id).emit("messageReceived", message);
+      client.to(toSocketInstance.id).emit("messageReceived", message);
+    }
   }
 
   @SubscribeMessage("acceptCall")
