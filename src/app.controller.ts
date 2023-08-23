@@ -68,6 +68,7 @@ export class AppController {
         idToken: body.idToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
+      console.log("google ticket", ticket);
       const googledata = ticket.getPayload();
       const user = await this.prismaService.user.findUnique({
         where: { email: googledata.email },
@@ -92,6 +93,7 @@ export class AppController {
 
       return { token, ...user };
     } catch (error) {
+      console.log("error with google", error);
       throw new InternalServerErrorException("An error has occured", error);
     }
   }
