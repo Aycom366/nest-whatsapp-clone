@@ -490,7 +490,6 @@ export class ConversationService {
             message: `created group "${name}"`,
           },
         },
-
         isGroup: true,
       },
       include: {

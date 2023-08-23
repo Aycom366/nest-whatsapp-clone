@@ -16,13 +16,15 @@ import { videoSvg } from "src/common/svg";
 
 @WebSocketGateway({
   cors: "*",
-  transports: ["websocket"],
 })
 export class EventGateway implements OnGatewayDisconnect {
   constructor(
     private readonly conversationService: ConversationService,
     private readonly sharedService: SharedService
   ) {}
+
+  count = 0;
+  disconnecting = 0;
 
   @WebSocketServer()
   server: Server;
@@ -48,14 +50,24 @@ export class EventGateway implements OnGatewayDisconnect {
     @ConnectedSocket() client: Socket
   ) {
     const { userId } = payload;
+
     if (this.sharedService.onlineUsers.has(userId))
       this.sharedService.onlineUsers.delete(userId);
 
     this.sharedService.onlineUsers.set(userId, client);
 
+    this.server.emit(
+      "onlineUsers",
+      Array.from(this.sharedService.onlineUsers.keys())
+    );
+
     const conversations = await this.conversationService.getRoomsUsersIsInto(
       userId
     );
+
+    this.count++;
+    console.log("joining count:", this.count);
+    console.log("joining", userId);
 
     conversations.forEach((conversation) => {
       const payload = {
@@ -65,10 +77,7 @@ export class EventGateway implements OnGatewayDisconnect {
       this.joinRoom(client, payload);
     });
 
-    this.server.emit(
-      "onlineUsers",
-      Array.from(this.sharedService.onlineUsers.keys())
-    );
+    console.log(this.sharedService.onlineUsers.keys());
   }
 
   public getUsersInRoom(roomName: string) {
@@ -114,17 +123,20 @@ export class EventGateway implements OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
+    this.disconnecting++;
+
     const disconnectedUserId = this.sharedService.getUserIdBySocket(client);
+    console.log("disconnecting id:", disconnectedUserId);
 
     if (disconnectedUserId) {
       this.sharedService.onlineUsers.delete(disconnectedUserId);
       this.sharedService.currentChatId.delete(disconnectedUserId);
-    }
 
-    this.server.emit(
-      "onlineUsers",
-      Array.from(this.sharedService.onlineUsers.keys())
-    );
+      this.server.emit(
+        "onlineUsers",
+        Array.from(this.sharedService.onlineUsers.keys())
+      );
+    }
 
     // Iterate through the sharedService.roomsMap to find the rooms the user is in and remove the user from those rooms.
     this.sharedService.roomsMap.forEach((userIds, roomName) => {
