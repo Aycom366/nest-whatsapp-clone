@@ -12,6 +12,7 @@ import { ConversationService } from "src/conversation/conversation.service";
 import { User } from "@prisma/client";
 import { SharedService } from "src/shared/shared.service";
 import { OnEvent } from "@nestjs/event-emitter";
+import { videoSvg } from "src/common/svg";
 
 @WebSocketGateway({
   cors: "*",
@@ -227,5 +228,120 @@ export class EventGateway implements OnGatewayDisconnect {
     roomNames.forEach((room) =>
       this.server.to(room).emit("messagesDeliver", updatedMessages)
     );
+  }
+
+  /**Calls**/
+  @SubscribeMessage("callUser")
+  async videoCallUser(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      signalData: any;
+      conversationId: number;
+      date: Date;
+      from: {
+        id: number;
+        name: string;
+        picture: string;
+      };
+      to: number;
+    }
+  ) {
+    const toSocketInstance = this.sharedService.onlineUsers.get(payload.to);
+    if (toSocketInstance) {
+      client.to(toSocketInstance.id).emit("incoming-video-call", payload);
+    } else {
+      this.server.to(client.id).emit("user-not-online");
+      await this.conversationService.SaveBotMessage(
+        payload.conversationId,
+        payload.to,
+        `${videoSvg} Missed Video call at ${new Date(
+          payload.date
+        ).toLocaleString("en-US", {
+          hour: "numeric",
+          minute: "numeric",
+          hour12: false,
+        })}`
+      );
+    }
+  }
+
+  @SubscribeMessage("cancel-video-calling")
+  async cancelVideoCalling(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      to: number;
+      conversationId: number;
+      date: Date;
+    }
+  ) {
+    const toSocketInstance = this.sharedService.onlineUsers.get(payload.to);
+    if (toSocketInstance) {
+      client.to(toSocketInstance.id).emit("cancel-video-calling", payload);
+
+      const message = await this.conversationService.SaveBotMessage(
+        payload.conversationId,
+        payload.to,
+        `${videoSvg} Missed Video call at ${new Date(
+          payload.date
+        ).toLocaleString("en-US", {
+          hour: "numeric",
+          minute: "numeric",
+          hour12: false,
+        })}`
+      );
+
+      client.to(toSocketInstance.id).emit("messageReceived", message);
+    }
+  }
+
+  @SubscribeMessage("acceptCall")
+  async answerCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      signal: any;
+      to: number;
+      type: "video" | "audio";
+    }
+  ) {
+    const toSocketInstance = this.sharedService.onlineUsers.get(payload.to);
+    if (toSocketInstance) {
+      if (payload.type === "video") {
+        client.to(toSocketInstance.id).emit("callAccepted", payload.signal);
+      } else {
+        //handle audio here
+      }
+    }
+  }
+
+  @SubscribeMessage("end-video-call")
+  async endCall(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      to: { id: number; name: string };
+    }
+  ) {
+    const toSocketInstance = this.sharedService.onlineUsers.get(payload.to.id);
+    if (toSocketInstance) {
+      client.to(toSocketInstance.id).emit("video-call-ended", payload.to.name);
+    }
+  }
+
+  @SubscribeMessage("call-rejected")
+  async callRejected(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      to: number;
+      from: string;
+    }
+  ) {
+    const toSocketInstance = this.sharedService.onlineUsers.get(payload.to);
+    if (toSocketInstance) {
+      return client.to(toSocketInstance.id).emit("call-rejected", payload);
+    }
   }
 }
