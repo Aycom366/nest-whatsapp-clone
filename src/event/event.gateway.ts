@@ -66,8 +66,6 @@ export class EventGateway implements OnGatewayDisconnect {
     );
 
     this.count++;
-    console.log("joining count:", this.count);
-    console.log("joining", userId);
 
     conversations.forEach((conversation) => {
       const payload = {
@@ -76,8 +74,6 @@ export class EventGateway implements OnGatewayDisconnect {
       };
       this.joinRoom(client, payload);
     });
-
-    console.log(this.sharedService.onlineUsers.keys());
   }
 
   public getUsersInRoom(roomName: string) {
@@ -126,7 +122,6 @@ export class EventGateway implements OnGatewayDisconnect {
     this.disconnecting++;
 
     const disconnectedUserId = this.sharedService.getUserIdBySocket(client);
-    console.log("disconnecting id:", disconnectedUserId);
 
     if (disconnectedUserId) {
       this.sharedService.onlineUsers.delete(disconnectedUserId);
