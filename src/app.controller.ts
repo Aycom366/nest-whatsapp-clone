@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   InternalServerErrorException,
   Post,
 } from "@nestjs/common";
@@ -53,6 +54,7 @@ const colors = [
   "#7c000e",
 ];
 
+@SkipAuth()
 @Controller()
 export class AppController {
   constructor(
@@ -60,7 +62,6 @@ export class AppController {
     private readonly jwtService: JwtService
   ) {}
 
-  @SkipAuth()
   @Post("/login")
   async login(@Body() body: LoginDto) {
     try {
@@ -94,5 +95,10 @@ export class AppController {
     } catch (error) {
       throw new InternalServerErrorException("An error has occured", error);
     }
+  }
+
+  @Get()
+  rootEndpoint() {
+    return "Whatsapp clone.";
   }
 }

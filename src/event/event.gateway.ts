@@ -23,9 +23,6 @@ export class EventGateway implements OnGatewayDisconnect {
     private readonly sharedService: SharedService
   ) {}
 
-  count = 0;
-  disconnecting = 0;
-
   @WebSocketServer()
   server: Server;
 
@@ -64,8 +61,6 @@ export class EventGateway implements OnGatewayDisconnect {
     const conversations = await this.conversationService.getRoomsUsersIsInto(
       userId
     );
-
-    this.count++;
 
     conversations.forEach((conversation) => {
       const payload = {
@@ -119,8 +114,6 @@ export class EventGateway implements OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
-    this.disconnecting++;
-
     const disconnectedUserId = this.sharedService.getUserIdBySocket(client);
 
     if (disconnectedUserId) {
