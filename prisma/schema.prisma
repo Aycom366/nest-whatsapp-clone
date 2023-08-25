@@ -11,11 +11,13 @@ datasource db {
 }
 
 model User {
-  id      Int    @id @default(autoincrement())
-  email   String @unique
-  picture String
-  name    String
-  color   String
+  id       Int     @id @default(autoincrement())
+  email    String  @unique
+  picture  String?
+  name     String
+  color    String
+  password String?
+  isGoogle Boolean @default(true)
 
   sentMessages Message[]      @relation("sentMessages")
   BotMessageTo Message[]      @relation("BotMessageTo")

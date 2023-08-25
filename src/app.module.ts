@@ -11,6 +11,8 @@ import { ConversationModule } from "./conversation/conversation.module";
 import { SharedModule } from "./shared/shared.module";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { EventModule } from "./event/event.module";
+import { AppService } from "./app.service";
+import { CloudinaryModule } from "./cloudinary/cloudinary.module";
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { EventModule } from "./event/event.module";
     MessageModule,
     ConversationModule,
     EventModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [
@@ -36,6 +39,7 @@ import { EventModule } from "./event/event.module";
       provide: APP_GUARD,
       useClass: AuthGuard,
     },
+    AppService,
   ],
 })
 export class AppModule {}
