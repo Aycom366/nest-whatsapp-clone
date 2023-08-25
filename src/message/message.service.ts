@@ -210,6 +210,7 @@ export class MessageService {
             },
             deliveredTo: true,
             seenUsers: true,
+            BotMessageTo: true,
           },
         });
       }),
@@ -273,6 +274,7 @@ export class MessageService {
         },
         deliveredTo: { select: { id: true } },
         seenUsers: { select: { id: true } },
+        BotMessageTo: true,
       },
     });
 
