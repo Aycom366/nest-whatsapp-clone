@@ -14,6 +14,17 @@ interface UpdateMessageStatusProps {
   messageId: number;
 }
 
+const userSelect = {
+  select: {
+    id: true,
+    color: true,
+    email: true,
+    name: true,
+    isGoogle: true,
+    picture: true,
+  },
+};
+
 @Injectable()
 export class MessageService {
   constructor(
@@ -44,10 +55,10 @@ export class MessageService {
 
     const message = await this.prismaService.message.create({
       include: {
-        seenUsers: true,
-        deliveredTo: true,
-        BotMessageTo: true,
-        sender: true,
+        seenUsers: userSelect,
+        deliveredTo: userSelect,
+        BotMessageTo: userSelect,
+        sender: userSelect,
       },
       data: {
         message: body.message,
@@ -125,10 +136,10 @@ export class MessageService {
         },
       },
       include: {
-        seenUsers: true,
-        sender: true,
-        deliveredTo: true,
-        BotMessageTo: true,
+        seenUsers: userSelect,
+        sender: userSelect,
+        deliveredTo: userSelect,
+        BotMessageTo: userSelect,
       },
     });
 
@@ -175,12 +186,12 @@ export class MessageService {
           select: {
             name: true,
             id: true,
-            users: true,
+            users: userSelect,
           },
         },
         deliveredTo: { select: { id: true } },
         seenUsers: { select: { id: true } },
-        BotMessageTo: true,
+        BotMessageTo: userSelect,
       },
     });
 
@@ -208,9 +219,9 @@ export class MessageService {
                 name: true,
               },
             },
-            deliveredTo: true,
-            seenUsers: true,
-            BotMessageTo: true,
+            deliveredTo: userSelect,
+            seenUsers: userSelect,
+            BotMessageTo: userSelect,
           },
         });
       }),
@@ -303,9 +314,9 @@ export class MessageService {
               : {},
           },
           include: {
-            deliveredTo: true,
-            seenUsers: true,
-            BotMessageTo: true,
+            deliveredTo: userSelect,
+            seenUsers: userSelect,
+            BotMessageTo: userSelect,
           },
         });
       }),
@@ -323,10 +334,10 @@ export class MessageService {
         conversationId,
       },
       include: {
-        seenUsers: true,
-        deliveredTo: true,
-        BotMessageTo: true,
-        sender: true,
+        seenUsers: userSelect,
+        deliveredTo: userSelect,
+        BotMessageTo: userSelect,
+        sender: userSelect,
       },
     });
 

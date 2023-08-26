@@ -15,6 +15,17 @@ interface IProp {
   name?: string;
 }
 
+const userSelect = {
+  select: {
+    id: true,
+    name: true,
+    color: true,
+    email: true,
+    isGoogle: true,
+    picture: true,
+  },
+};
+
 interface UpdateProps {
   loggedInUser: number;
   conversationId: number;
@@ -45,10 +56,10 @@ export class ConversationService {
         BotMessageToId,
       },
       include: {
-        seenUsers: true,
-        deliveredTo: true,
-        BotMessageTo: true,
-        sender: true,
+        seenUsers: userSelect,
+        deliveredTo: userSelect,
+        BotMessageTo: userSelect,
+        sender: userSelect,
       },
     });
 
@@ -88,7 +99,7 @@ export class ConversationService {
         },
       },
       include: {
-        groupAdmins: true,
+        groupAdmins: userSelect,
 
         Message: {
           take: 1,
@@ -96,10 +107,10 @@ export class ConversationService {
             createdAt: "desc",
           },
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
-            sender: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
+            sender: userSelect,
           },
         },
       },
@@ -134,12 +145,12 @@ export class ConversationService {
       include: {
         Message: {
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
           },
         },
-        users: true,
+        users: userSelect,
       },
     });
 
@@ -168,12 +179,12 @@ export class ConversationService {
               createdAt: "desc",
             },
             include: {
-              seenUsers: true,
-              deliveredTo: true,
-              BotMessageTo: true,
+              seenUsers: userSelect,
+              deliveredTo: userSelect,
+              BotMessageTo: userSelect,
             },
           },
-          users: true,
+          users: userSelect,
         },
       });
 
@@ -220,18 +231,18 @@ export class ConversationService {
         },
       },
       include: {
-        users: true,
-        groupAdmins: true,
+        users: userSelect,
+        groupAdmins: userSelect,
         Message: {
           take: 1,
           orderBy: {
             createdAt: "desc",
           },
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
-            sender: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
+            sender: userSelect,
           },
         },
       },
@@ -275,10 +286,10 @@ export class ConversationService {
             createdAt: "desc",
           },
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
-            sender: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
+            sender: userSelect,
           },
         },
       },
@@ -341,14 +352,14 @@ export class ConversationService {
       },
 
       include: {
-        users: true,
-        groupAdmins: true,
+        users: userSelect,
+        groupAdmins: userSelect,
         Message: {
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
-            sender: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
+            sender: userSelect,
           },
           take: 1,
           orderBy: {
@@ -398,7 +409,7 @@ export class ConversationService {
     } = payload;
     const conversation = await this.prismaService.conversation.findUnique({
       where: { id: conversationId },
-      include: { groupAdmins: true, users: true },
+      include: { groupAdmins: userSelect, users: userSelect },
     });
     if (!conversation) throw new NotFoundException("conversation not found");
 
@@ -433,10 +444,10 @@ export class ConversationService {
       include: {
         Message: {
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
-            sender: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
+            sender: userSelect,
           },
           take: 1,
           orderBy: {
@@ -493,16 +504,16 @@ export class ConversationService {
         isGroup: true,
       },
       include: {
-        users: true,
+        users: userSelect,
         Message: {
           include: {
-            sender: true,
-            deliveredTo: true,
-            seenUsers: true,
-            BotMessageTo: true,
+            sender: userSelect,
+            deliveredTo: userSelect,
+            seenUsers: userSelect,
+            BotMessageTo: userSelect,
           },
         },
-        groupAdmins: true,
+        groupAdmins: userSelect,
         createdBy: { select: { name: true, id: true } },
       },
     });
@@ -529,17 +540,17 @@ export class ConversationService {
       include: {
         Message: {
           include: {
-            seenUsers: true,
-            deliveredTo: true,
-            BotMessageTo: true,
+            seenUsers: userSelect,
+            deliveredTo: userSelect,
+            BotMessageTo: userSelect,
             sender: {
               select: { name: true, color: true },
             },
           },
         },
 
-        groupAdmins: true,
-        users: true,
+        groupAdmins: userSelect,
+        users: userSelect,
         createdBy: { select: { name: true, id: true } },
       },
       orderBy: {

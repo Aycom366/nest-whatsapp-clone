@@ -14,6 +14,13 @@ export class UserController {
           email: request.user.email,
         },
       },
+      select: {
+        id: true,
+        color: true,
+        email: true,
+        name: true,
+        picture: true,
+      },
     });
 
     const userGroupByInitialLetter = {};
