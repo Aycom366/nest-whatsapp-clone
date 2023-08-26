@@ -549,18 +549,25 @@ export class ConversationService {
 
     const sortedConversations = conversations
       .map((conversation) => {
-        const unSeenCount = conversation.Message.filter(
-          (message) =>
-            !message.seenUsers.some((user) => user.id === currentLoginUserId) &&
-            message.messageType !== "Bot"
-        ).length;
+        let mostRecentMessageTimestamp = 0;
+        let mostRecentMessage = null;
+
+        if (conversation.Message.length > 0) {
+          mostRecentMessage = conversation.Message.reduce(
+            (mostRecent, current) =>
+              current.createdAt > mostRecent.createdAt ? current : mostRecent
+          );
+          mostRecentMessageTimestamp = mostRecentMessage.createdAt.getTime();
+        }
 
         return {
           ...conversation,
-          unSeenCount,
+          mostRecentMessageTimestamp,
         };
       })
-      .sort((a, b) => b.unSeenCount - a.unSeenCount);
+      .sort(
+        (a, b) => b.mostRecentMessageTimestamp - a.mostRecentMessageTimestamp
+      );
 
     return sortedConversations;
   }
