@@ -14,10 +14,7 @@ import {
   UseInterceptors,
 } from "@nestjs/common";
 import { MessageService } from "./message.service";
-import {
-  SendMessageDto,
-  UpdateMessageStatus,
-} from "src/dtos/converseMessage.dto";
+import { SendMessageDto } from "src/dtos/converseMessage.dto";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { MessageType } from "@prisma/client";
 import { CloudinaryService } from "src/cloudinary/cloudinary.service";
@@ -32,6 +29,17 @@ export class MessageController {
   @Post()
   sendMessage(@Body() body: SendMessageDto, @Request() request) {
     return this.messageService.sendMessage(request.user.id, body as any);
+  }
+
+  @Patch()
+  updateMessagesStatus(
+    @Body() body: { messagesId: number[] },
+    @Request() request
+  ) {
+    return this.messageService.updateMessagesStatus({
+      messageIds: body.messagesId,
+      userId: request.user.id,
+    });
   }
 
   @Post("/file-upload/image")
@@ -78,11 +86,6 @@ export class MessageController {
       message: cloud.secure_url,
       messageType: messageType,
     });
-  }
-
-  @Patch()
-  updateMessageStatus(@Body() body: UpdateMessageStatus, @Request() request) {
-    return this.messageService.updateMessageStatus(body, request.user.id);
   }
 
   @Patch("/deliver")

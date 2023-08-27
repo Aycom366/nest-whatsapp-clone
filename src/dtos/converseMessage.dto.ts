@@ -38,11 +38,6 @@ export class AddParticipantsDto {
   participants: ParticipantDto[];
 }
 
-export class UpdateMessageStatus {
-  @IsNumber()
-  messageId: number;
-}
-
 export class SendMessageDto {
   @IsOptional()
   @IsEnum(MessageType)
