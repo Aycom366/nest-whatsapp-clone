@@ -13,6 +13,7 @@ import { User } from "@prisma/client";
 import { SharedService } from "src/shared/shared.service";
 import { OnEvent } from "@nestjs/event-emitter";
 import { videoSvg } from "src/common/svg";
+import { MessageService } from "src/message/message.service";
 
 @WebSocketGateway({
   cors: "*",
@@ -20,6 +21,7 @@ import { videoSvg } from "src/common/svg";
 export class EventGateway implements OnGatewayDisconnect {
   constructor(
     private readonly conversationService: ConversationService,
+    private readonly messageService: MessageService,
     private readonly sharedService: SharedService
   ) {}
 
@@ -102,6 +104,26 @@ export class EventGateway implements OnGatewayDisconnect {
     client
       .to(payload.roomName)
       .emit("stopMessageAction", payload.conversationId);
+  }
+
+  @SubscribeMessage("updateOtherUsersMessageStatus")
+  async updateOtherUsersMessageStatus(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    payload: {
+      updatedMessages: any;
+      roomName: string;
+    }
+  ) {
+    client
+      .to(payload.roomName)
+      .emit("messagesDeliver", payload.updatedMessages);
+    // this.messageService
+    //   .updateMessagesStatus({
+    //     messageIds: payload.updatedMessages.map((con) => con.id),
+    //     userId: this.sharedService.getUserIdBySocket(client),
+    //   })
+    //   .then(() => {});
   }
 
   @SubscribeMessage("setCurrentChatId")
@@ -208,15 +230,6 @@ export class EventGateway implements OnGatewayDisconnect {
         .to(newRoomName)
         .emit("updateConversationInformation", conversation);
     }
-  }
-
-  @OnEvent("messages.updated")
-  sendUpdateMessagesToConnectedSockets(payload: {
-    roomName: string;
-    updatedMessages: any;
-  }) {
-    const { roomName, updatedMessages } = payload;
-    this.server.to(roomName).emit("updateMessageStatus", updatedMessages);
   }
 
   @OnEvent("messages.deliver")

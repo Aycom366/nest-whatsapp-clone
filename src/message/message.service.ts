@@ -11,7 +11,8 @@ interface IProps {
 }
 
 interface UpdateMessageStatusProps {
-  messageId: number;
+  messageIds: number[];
+  userId: number;
 }
 
 const userSelect = {
@@ -89,64 +90,23 @@ export class MessageService {
     return message;
   }
 
-  async updateMessageStatus(body: UpdateMessageStatusProps, userId: number) {
-    const existingMessage = await this.prismaService.message.findUnique({
-      where: { id: body.messageId, NOT: { messageType: "Bot" } },
-      select: {
-        conversationId: true,
-        deliveredTo: { select: { id: true } },
-        seenUsers: { select: { id: true } },
-        senderId: true,
-      },
-    });
-    if (!existingMessage) throw new NotFoundException();
-
-    const conversationData = await this.prismaService.conversation.findUnique({
-      where: { id: existingMessage.conversationId },
-      select: {
-        users: {
-          select: { id: true },
-        },
-        id: true,
-        name: true,
-      },
-    });
-
-    const globalOnlineUsers = Array.from(this.sharedService.onlineUsers.keys());
-
-    const seenUsers = globalOnlineUsers
-      .filter(
-        (id) =>
-          this.sharedService.currentChatId.get(id) === conversationData.id &&
-          existingMessage.senderId !== id &&
-          this.sharedService.roomsMap.get(conversationData.name).has(id)
-      )
-      .map((id) => ({ id }));
-
-    const newMessage = await this.prismaService.message.update({
-      where: { id: body.messageId },
-      data: {
-        deliveredTo: {
-          connect: {
-            id: userId,
+  async updateMessagesStatus(body: UpdateMessageStatusProps) {
+    const { messageIds, userId } = body;
+    await this.prismaService.$transaction([
+      ...messageIds.map((id) => {
+        return this.prismaService.message.update({
+          where: { id },
+          data: {
+            seenUsers: { connect: { id: userId } },
+            deliveredTo: { connect: { id: userId } },
           },
-        },
-        seenUsers: {
-          connect: seenUsers,
-        },
-      },
-      include: {
-        seenUsers: userSelect,
-        sender: userSelect,
-        deliveredTo: userSelect,
-        BotMessageTo: userSelect,
-      },
-    });
-
-    this.eventEmitter.emit("messages.updated", {
-      roomName: conversationData.name,
-      updatedMessages: newMessage,
-    });
+          include: {
+            seenUsers: true,
+          },
+        });
+      }),
+    ]);
+    return;
   }
 
   async updateMessageStatusToDeliver(loginUserId: number) {
