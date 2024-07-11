@@ -47,6 +47,8 @@ model Conversation {
 
   users   User[]    @relation("users")
   Message Message[]
+
+  @@index([createdAt])
 }
 
 model Message {
@@ -68,6 +70,8 @@ model Message {
 
   seenUsers   User[] @relation("seenUsers")
   deliveredTo User[] @relation("deliveredTo")
+
+  @@index([createdAt])
 }
 
 enum MessageType {

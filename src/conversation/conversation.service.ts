@@ -536,7 +536,6 @@ export class ConversationService {
           },
         },
       },
-      take: 50,
       include: {
         Message: {
           include: {
@@ -556,6 +555,7 @@ export class ConversationService {
       orderBy: {
         createdAt: "desc",
       },
+      take: 50,
     });
 
     const sortedConversations = conversations
